@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project version="4">
-  <component name="Black">
-    <option name="enabledOnReformat" value="true" />
-    <option name="enabledOnSave" value="true" />
-    <option name="sdkUUID" value="a18a5103-58a1-441e-a02e-4ecdb99214ab" />
-  </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Poetry (pickem-api)" project-jdk-type="Python SDK" />
-</project>
