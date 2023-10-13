@@ -16,14 +16,14 @@ jobs:
         uses: snok/install-poetry@v1
       - run: poetry config virtualenvs.create false
       - run: poetry install --no-interaction --no-ansi --no-root
-      - run: zip -r9 lambda-deployment-package.zip .
+      - run: zip -r9 ./package.zip .
       - run: pwd
       - run: ls -ltr
       - name: Upload Zipfile
         uses: actions/upload-artifact@v2
         with:
-         name: lambda-deployment-package.zip
-         path: lambda-deployment-package.zip
+         name: package.zip
+         path: ./package.zip
       - name: Upload S3
         uses: shallwefootball/s3-upload-action@master
         id: S3
@@ -31,7 +31,7 @@ jobs:
          aws_key_id: ${{secrets.AWS_KEY_ID}}
          aws_secret_access_key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
          aws_bucket: ${{ secrets.AWS_BUCKET }}
-         source_dir: public/lambda-deployment-package.zip
+         source_dir: ./package.zip
       - name: Link To Report
         run: echo "https://s3.amazonaws.com/bucketName/${{steps.S3.outputs.object_key}}/index.html"
 
