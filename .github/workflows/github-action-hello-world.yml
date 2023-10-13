@@ -28,5 +28,5 @@ jobs:
           aws_key_id: ${{ secrets.AWS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
           aws_bucket: ${{ secrets.AWS_BUCKET }}
-          source_dir: 'lambda-deployment-package.zip'
+          source_dir: ${{ github.workspace }}/lambda-deployment-package.zip
 
