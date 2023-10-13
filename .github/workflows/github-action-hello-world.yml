@@ -31,7 +31,7 @@ jobs:
          aws_key_id: ${{secrets.AWS_KEY_ID}}
          aws_secret_access_key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
          aws_bucket: ${{ secrets.AWS_BUCKET }}
-         source_dir: pickem-api
+         source_dir: public/lambda-deployment-package.zip
       - name: Link To Report
         run: echo "https://s3.amazonaws.com/bucketName/${{steps.S3.outputs.object_key}}/index.html"
 
