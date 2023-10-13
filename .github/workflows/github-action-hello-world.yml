@@ -14,20 +14,24 @@ jobs:
           python-version: '3.11'
       - name: Install Poetry
         uses: snok/install-poetry@v1
-      - name: List files in the repository
-        run: |
-          ls ${{ github.workspace }}
       - run: poetry config virtualenvs.create false
       - run: poetry install --no-interaction --no-ansi --no-root
       - run: zip -r9 lambda-deployment-package.zip .
       - run: pwd
       - run: ls -ltr
-      - run: echo "🍏 This job's status is ${{ job.status }}."
-      - name: Upload S3
-        uses: shallwefootball/upload-s3-action@v1.3.3
+      - name: Upload Zipfile
+        uses: actions/upload-artifact@v2
         with:
-          aws_key_id: ${{ secrets.AWS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
-          aws_bucket: ${{ secrets.AWS_BUCKET }}
-          source_dir: pickem-api/lambda-deployment-package.zip
+         name: Zipfile
+         path: lambda-deployment-package.zip
+      - name: Upload S3
+        uses: shallwefootball/s3-upload-action@master
+        id: S3
+        with:
+         aws_key_id: ${{secrets.AWS_KEY_ID}}
+         aws_secret_access_key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
+         aws_bucket: ${{ secrets.AWS_BUCKET }}
+         source_dir: lambda-deployment-package.zip
+      - name: Link To Report
+        run: echo "https://s3.amazonaws.com/bucketName/${{steps.S3.outputs.object_key}}/index.html"
 
