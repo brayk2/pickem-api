@@ -4,7 +4,7 @@ version = "0.0.1"
 description = "PickEm API"
 authors = ["Brayden Kness <brayk2@gmail.com>"]
 readme = "README.md"
-packages = [{include = "app"}]
+packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
