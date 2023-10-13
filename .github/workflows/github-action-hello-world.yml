@@ -17,7 +17,7 @@ jobs:
       - run: mkdir package
       - run: poetry install && poetry build --format wheel
       - run: poetry run pip install -U -t ./package ./dist/*.whl
-      - run: zip -r package.zip package/*
+      - run: cd package && zip -r package.zip * && mv package.zip ..
       - name: Upload Zipfile
         uses: actions/upload-artifact@v3.1.3
         with:
