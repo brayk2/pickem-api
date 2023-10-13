@@ -21,8 +21,8 @@ jobs:
       - name: Upload Zipfile
         uses: actions/upload-artifact@v3.1.3
         with:
-         name: package.zip
-         path: package
+         name: package
+         path: package.zip
       - name: Upload to S3
         shell: bash
         run: |
