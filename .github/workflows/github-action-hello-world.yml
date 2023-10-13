@@ -22,3 +22,11 @@ jobs:
       - run: zip -r9 lambda-deployment-package.zip .
       - run: ls -ltr
       - run: echo "🍏 This job's status is ${{ job.status }}."
+      - name: Upload S3
+        uses: shallwefootball/upload-s3-action@v1.3.3
+        with:
+          aws_key_id: ${{ secrets.AWS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
+          aws_bucket: ${{ secrets.AWS_BUCKET }}
+          source_dir: 'lambda-deployment-package.zip'
+
