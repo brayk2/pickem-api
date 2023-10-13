@@ -14,15 +14,14 @@ jobs:
           python-version: '3.11'
       - name: Install Poetry
         uses: snok/install-poetry@v1
-      - run: poetry config virtualenvs.create false
-      - run: poetry install --no-interaction --no-ansi
-      - run: pwd
-      - run: ls -ltr
+      - run: mkdir package
+      - run: poetry install && poetry build --format wheel
+      - run: poetry run pip install -U -t ./package ./dist/*.whl
       - name: Upload Zipfile
         uses: actions/upload-artifact@v3.1.3
         with:
          name: package.zip
-         path: .
+         path: package
       - name: Upload to S3
         shell: bash
         run: |
