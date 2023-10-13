@@ -7,6 +7,7 @@ from peewee import (
     IntegerField,
     ForeignKeyField,
     BooleanField,
+    Proxy,
 )
 from datetime import datetime
 

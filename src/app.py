@@ -1,6 +1,8 @@
+import functools
 import logging
 
-from fastapi import FastAPI
+import starlette.requests
+from fastapi import FastAPI, APIRouter
 from mangum import Mangum
 from starlette.middleware.cors import CORSMiddleware
 
@@ -20,6 +22,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(api)
 
-handler = Mangum(app)
+ping_router = APIRouter(prefix="", tags=["Ping"])
+
+
+@ping_router.get("/")
+def ping():
+    return {"hello": "world"}
+
+
+app.include_router(api)
+app.include_router(ping_router)
+
+
+def dec(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        print(f"args: {args}")
+        print(f"kwargs: {kwargs}")
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+handler = dec(Mangum(app))
