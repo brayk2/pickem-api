@@ -15,8 +15,9 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
       - run: poetry config virtualenvs.create false
-      - run: poetry install --no-interaction --no-ansi --no-root
-      - run: zip -r9 ./package.zip .
+      - run: poetry install --no-interaction --no-ansi
+      - run: ls -ltr
+      - run: zip -r9 package.zip .
       - run: pwd
       - run: ls -ltr
       - name: Upload Zipfile
