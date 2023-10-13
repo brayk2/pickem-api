@@ -22,7 +22,7 @@ jobs:
       - name: Upload Zipfile
         uses: actions/upload-artifact@v2
         with:
-         name: Zipfile
+         name: lambda-deployment-package.zip
          path: lambda-deployment-package.zip
       - name: Upload S3
         uses: shallwefootball/s3-upload-action@master
@@ -31,7 +31,7 @@ jobs:
          aws_key_id: ${{secrets.AWS_KEY_ID}}
          aws_secret_access_key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
          aws_bucket: ${{ secrets.AWS_BUCKET }}
-         source_dir: lambda-deployment-package.zip
+         source_dir: pickem-api
       - name: Link To Report
         run: echo "https://s3.amazonaws.com/bucketName/${{steps.S3.outputs.object_key}}/index.html"
 
