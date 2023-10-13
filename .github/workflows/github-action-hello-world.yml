@@ -3,7 +3,7 @@ run-name: Build Docker Image
 on: [push]
 jobs:
   build-image:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
       - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
@@ -15,5 +15,8 @@ jobs:
       - name: List files in the repository
         run: |
           ls ${{ github.workspace }}
-      - run: docker build --platform linux/arm64 -t pickem ${{ github.workspace }}
+#      - run: docker build --platform linux/arm64 -t pickem ${{ github.workspace }}
+      - run: ${{ github.workspace }}/build.sh
+      - run: |
+          ls ${{ github.workspace }}
       - run: echo "🍏 This job's status is ${{ job.status }}."
