@@ -20,6 +20,7 @@ jobs:
       - run: poetry config virtualenvs.create false
       - run: poetry install --no-interaction --no-ansi --no-root
       - run: zip -r9 lambda-deployment-package.zip .
+      - run: pwd
       - run: ls -ltr
       - run: echo "🍏 This job's status is ${{ job.status }}."
       - name: Upload S3
