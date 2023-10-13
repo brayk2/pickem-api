@@ -1,0 +1,30 @@
+name: 'Deploy to Lambda Function'
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Repo Tag Name (Ex.: yyyymmdd-hhmmss)'
+        type: string
+        required: true
+
+jobs:
+  Deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 'Configure AWS Credentials'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: 'Update Source Code'
+        run: |
+          aws lambda update-function-code \
+            --function-name=${{ secrets.AWS_LAMBDA_FUNCTION_NAME }} \
+            --s3-bucket=${{ secrets.AWS_BUCKET }} \
+            --s3-key=artifact.zip \
+            --cli-read-timeout 60 \
+            --cli-connect-timeout 60

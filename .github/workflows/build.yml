@@ -1,0 +1,33 @@
+name: Build Package for AWS Lambda
+
+on: [push]
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 'Setup python'
+        id: setup-python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 'Create Package'
+        id: 'create_package'
+        uses: snok/install-poetry@v1
+        run: |
+          poetry install && poetry build
+          poetry run pip install --upgrade -t package dist/*.whl
+          cd package ; zip -r ../artifact.zip . -x '*.pyc'
+
+      - name: 'Configure AWS Credentials'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: 'Upload to S3'
+        run: aws s3 cp artifact.zip s3://${{ secrets.AWS_BUCKET }}/
