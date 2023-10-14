@@ -6,8 +6,7 @@ jobs:
   Build:
     runs-on: ubuntu-latest
     steps:
-      - name: 'Checkout'
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: 'Setup python'
         id: setup-python
@@ -15,9 +14,11 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: 'Install Poetry'
+        uses: snok/install-poetry@v1
+
       - name: 'Create Package'
         id: 'create_package'
-        uses: snok/install-poetry@v1
         run: |
           poetry install && poetry build
           poetry run pip install --upgrade -t package dist/*.whl
