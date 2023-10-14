@@ -1,12 +1,10 @@
 name: 'Deploy to Lambda Function'
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Repo Tag Name (Ex.: yyyymmdd-hhmmss)'
-        type: string
-        required: true
+  workflow_run:
+    workflows: ['Build Package for AWS Lambda']
+    types:
+      - completed
 
 jobs:
   Deploy:
