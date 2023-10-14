@@ -1,3 +1,5 @@
+from typing import Optional
+
 from peewee import (
     Model,
     DateTimeField,
@@ -72,6 +74,15 @@ class TeamModel(BaseModel):
         table_name = "team"
 
 
+class ResultsModel(BaseModel):
+    completed: bool = BooleanField(null=True, default=False)
+    home_score: int = IntegerField(default=0)
+    away_score: int = IntegerField(default=0)
+
+    class Meta:
+        table_name = "results"
+
+
 class GameModel(BaseModel):
     season: SeasonModel = ForeignKeyField(
         backref="games", column_name="season_id", field="id", model=SeasonModel
@@ -85,6 +96,9 @@ class GameModel(BaseModel):
         model=TeamModel,
         column_name="away_team",
         field="name",
+    )
+    results: Optional[ResultsModel] = ForeignKeyField(
+        model=ResultsModel, column_name="results_id", field="id", null=True
     )
     reference: str = CharField(null=True)
     start_time: datetime = DateTimeField(null=True)
@@ -135,16 +149,3 @@ class PropertyModel(BaseModel):
 
     class Meta:
         table_name = "property"
-
-
-class ResultsModel(BaseModel):
-    completed: bool = BooleanField(null=True, default=False)
-    home_score: int = IntegerField(default=0)
-    away_score: int = IntegerField(default=0)
-    game: GameModel = ForeignKeyField(
-        backref="results",
-        model=GameModel,
-    )
-
-    class Meta:
-        table_name = "results"

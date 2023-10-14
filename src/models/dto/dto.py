@@ -31,5 +31,5 @@ class Game(BaseModel):
     home_team: Team
     away_team: Team
     spreads: list[Spread]
-    results: list[Results]
+    results: Optional[Results] = None
     start_time: Optional[datetime] = None

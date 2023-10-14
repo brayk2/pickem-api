@@ -104,14 +104,17 @@ class SpreadService(BaseService):
                     continue
 
                 try:
-                    result, created = ResultsModel.get_or_create(
-                        game=game,
-                    )
+                    result = game.results
+                    if not result:
+                        result = ResultsModel()
+
                     result.home_score = home_score
                     result.away_score = away_score
                     result.completed = item.completed
 
                     result.save()
+                    game.results = result
+                    game.save()
                     self.logger.info(f"created result for {game.oddsapi_id} - {result}")
                 except peewee.IntegrityError as e:
                     self.logger.error(f"failed to create: {e}")

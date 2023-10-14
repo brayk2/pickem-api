@@ -4,7 +4,7 @@ from src.services.scrapers.base_scraper import BaseScraper
 
 class NflScraper(BaseScraper):
     def __init__(self):
-        super().__init__(url="https://www.nfl.com")
+        super().__init__(base_url="https://www.nfl.com")
 
     def scrape_thumbnails(self):
         self.logger.info("scraping nfl thumbnails from nfl.com")
