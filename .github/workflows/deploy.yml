@@ -1,4 +1,4 @@
-name: 'Deploy to Lambda Function'
+name: 'Deploy'
 
 on:
   workflow_run:
