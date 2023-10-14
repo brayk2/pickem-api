@@ -1,4 +1,4 @@
-name: 'Build Package for AWS Lambda'
+name: 'Build'
 
 on: [push]
 
