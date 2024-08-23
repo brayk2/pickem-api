@@ -24,7 +24,7 @@ nordvpn-switcher = "^0.3.0"
 pyjwt = "^2.9.0"
 bcrypt = "^4.2.0"
 pytz = "^2024.1"
-passlib = "^1.7.4"
+#passlib = "^1.7.4"
 python-jose = "^3.3.0"
 strenum = "^0.4.15"
 pydantic = {extras = ["email"], version = "^2.8.2"}
