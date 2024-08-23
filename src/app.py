@@ -71,6 +71,7 @@ api.include_router(game_router)
 api.include_router(team_router)
 api.include_router(scrape_router)
 
+# api and ping routers
 app.include_router(api)
 app.include_router(ping_router)
 
