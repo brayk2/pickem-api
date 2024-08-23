@@ -1,4 +1,4 @@
-FROM public.ecr.aws/lambda/python:3.9
+FROM public.ecr.aws/lambda/python:3.11
 
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
