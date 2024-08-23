@@ -3,6 +3,7 @@ from functools import cached_property
 import httpx
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
+from proxy_requests import ProxyRequests
 
 from src.config.base_service import BaseService
 from src.util.injection import dependency, inject
@@ -26,13 +27,16 @@ class BaseScraper(BaseService):
         :return: BeautifulSoup object setup with the url param
         """
         self.logger.info(f"generating static soup: {url}")
+
         page = self.client.get(url)
         soup = BeautifulSoup(page.content, "html.parser")
         return soup
 
+    # TODO: This may not work with proxy
     def _get_dynamic_soup(self, url: str) -> BeautifulSoup:
         """
-        Generate BeautifulSoup for a dynamic JS site. Open site in chromium browser then init BeautifulSoup with page contents, closing the browser on exit.
+        Generate BeautifulSoup for a dynamic JS site. Open site in Chromium browser
+        then init BeautifulSoup with page contents, closing the browser on exit.
         :param url: the endpoint to init BeautifulSoup [full url is base_url/url]
         :return: BeautifulSoup object setup with the url param
         """

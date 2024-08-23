@@ -1,4 +1,4 @@
-from src.models.db_models import TeamModel
+from src.models.new_db_models import TeamModel
 from src.services.scrapers.base_scraper import BaseScraper
 
 
@@ -13,10 +13,16 @@ class NflScraper(BaseScraper):
         for figure in figures:
             img = figure.find("img")
             team, src = img.get("alt"), img.get("data-src")
+            city, name = team.rsplit(" ", 1)
 
-            if team_model := TeamModel.get_or_none(name=team):
+            if team_model := TeamModel.get_or_none(city=city, name=name):
                 self.logger.info(f"saving thumbnail for team {team}")
                 team_model.thumbnail = src
                 team_model.save()
             else:
                 self.logger.info(f"cannot find team {team}")
+
+
+if __name__ == "__main__":
+    scraper = NflScraper()
+    scraper.scrape_thumbnails()

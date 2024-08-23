@@ -4,5 +4,5 @@ ping_router = APIRouter(prefix="/ping", tags=["Ping"])
 
 
 @ping_router.get("")
-def ping():
+async def ping():
     return {"healthy": True}

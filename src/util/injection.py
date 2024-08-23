@@ -1,11 +1,15 @@
 import functools
+import logging
 from unittest.mock import MagicMock
 
-from src.config.logger import get_logger
 from src.util.dependency_cache import DependencyCache
 
-logger = get_logger(__name__)
+logger = logging.getLogger(name=__name__)
 _attr = "__dependency__"
+
+
+def _inject(cls):
+    return cls()
 
 
 def dependency(cls):

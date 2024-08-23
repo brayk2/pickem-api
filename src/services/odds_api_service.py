@@ -1,10 +1,11 @@
 import datetime
 import functools
-from typing import Optional, TypeVar, Annotated
+from typing import TypeVar
 
 import httpx
-from pydantic import BaseModel, Field, TypeAdapter, BeforeValidator
+from pydantic import BaseModel, Field, TypeAdapter
 
+from src.components.admin.admin_service import AdminService
 from src.config.base_service import BaseService
 from src.services.property_service import PropertyService
 from src.util.injection import dependency, inject
@@ -16,8 +17,21 @@ def empty_list(v: any) -> any:
     return v
 
 
-L = TypeVar("L")
-List = Annotated[list[L], BeforeValidator(empty_list)]
+T = TypeVar("T", bound=BaseModel)
+
+
+def validate_response(model: type[T | list[T]]):
+    def wrapper(f):
+        @functools.wraps(f)
+        def inner(*args, **kwargs) -> T | list[T]:
+            output = f(*args, **kwargs)
+            if isinstance(output, list):
+                return TypeAdapter(list[model.__args__[0]]).validate_python(output)
+            return model.model_validate(output)
+
+        return inner
+
+    return wrapper
 
 
 class GameDto(BaseModel):
@@ -34,73 +48,60 @@ class ScoreDto(BaseModel):
 
 class ScoresDto(GameDto):
     completed: bool
-    last_updated: Optional[datetime.datetime] = Field(default=None)
-    scores: List[ScoreDto]
+    last_updated: datetime.datetime | None = Field(default=None)
+    scores: list[ScoreDto]
 
 
 class OutcomeDto(BaseModel):
     name: str
-    price: Optional[int] = Field(default=None)
-    point: Optional[float] = Field(default=None)
+    price: int | None = Field(default=None)
+    point: float | None = Field(default=None)
 
 
 class MarketDto(BaseModel):
     key: str
-    last_update: Optional[datetime.datetime] = Field(default=None)
-    outcomes: List[OutcomeDto]
+    last_update: datetime.datetime | None = Field(default=None)
+    outcomes: list[OutcomeDto]
 
 
 class BookmakerDto(BaseModel):
     key: str
     title: str
-    last_update: Optional[datetime.datetime] = Field(default=None)
-    markets: List[MarketDto]
+    last_update: datetime.datetime | None = Field(default=None)
+    markets: list[MarketDto]
 
 
 class OddsDto(GameDto):
-    bookmakers: List[BookmakerDto]
-
-
-T = TypeVar("T", bound=BaseModel)
-
-
-def validate_response(model: type[T | list[T]]):
-    def wrapper(f):
-        @functools.wraps(f)
-        def inner(*args, **kwargs) -> T | list[T]:
-            output = f(*args, **kwargs)
-            if model.__origin__ is list:
-                return TypeAdapter(model).validate_python(output)
-            return model.model_validate(output)
-
-        return inner
-
-    return wrapper
+    bookmakers: list[BookmakerDto]
 
 
 @dependency
 class OddsApiService(BaseService):
     @inject
-    def __init__(self, property_service: PropertyService):
-        self.property_service = property_service
+    def __init__(self, admin_service: AdminService, property_service: PropertyService):
         self.base_url = "https://api.the-odds-api.com/v4/sports/americanfootball_nfl"
+        self.admin_service = admin_service
+        self.property_service = property_service
 
     @property
-    def client(self):
+    def client(self) -> httpx.Client:
         return httpx.Client(
             timeout=60, base_url=self.base_url, headers={"accept": "*/*"}
         )
 
     def save_remaining(self, response: httpx.Response):
-        self.property_service.set_oddsapi_quota(
-            quota={
-                "used": response.headers.get("x-requests-used"),
-                "remaining": response.headers.get("x-requests-remaining"),
-            }
-        )
+        try:
+            self.admin_service.set_oddsapi_quota(
+                quota={
+                    "used": response.headers.get("x-requests-used"),
+                    "remaining": response.headers.get("x-requests-remaining"),
+                }
+            )
+        except Exception as e:
+            self.logger.info(f"failed to save api quota : {e}")
 
     @validate_response(model=list[OddsDto])
-    def fetch_odds(self):
+    def fetch_odds(self) -> list[OddsDto]:
         response = self.client.get(
             url="odds",
             params={
@@ -115,7 +116,7 @@ class OddsApiService(BaseService):
         return response.json()
 
     @validate_response(model=list[ScoresDto])
-    def fetch_scores(self):
+    def fetch_scores(self) -> list[ScoresDto]:
         response = self.client.get(
             url="scores",
             params={

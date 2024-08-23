@@ -1,10 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from src.config.logger import get_logger
 from src.services.scrapers.nfl_scraper import NflScraper
 from src.services.scrapers.pfr_scraper import PfrScraper
 
-logger = get_logger(__name__)
 pfr_scraper = PfrScraper()
 nfl_scraper = NflScraper()
 
@@ -17,7 +15,7 @@ class GenericResponse(BaseModel):
 
 
 @scrape_router.post("/teams", response_model=GenericResponse)
-def scape_teams():
+async def scape_teams():
     try:
         pfr_scraper.scrape_teams()
         return {
@@ -29,9 +27,9 @@ def scape_teams():
 
 
 @scrape_router.post("/schedule", response_model=GenericResponse)
-def scape_schedule():
+async def scape_schedule(year: str = Query(default="2023")):
     try:
-        pfr_scraper.scrape_schedule()
+        pfr_scraper.scrape_schedule(year=year)
         return {
             "error": False,
             "message": f"Successfully scraped schedule from {pfr_scraper.base_url}",
@@ -41,7 +39,7 @@ def scape_schedule():
 
 
 @scrape_router.post("/thumbnails", response_model=GenericResponse)
-def scape_thumbnails():
+async def scape_thumbnails():
     try:
         nfl_scraper.scrape_thumbnails()
         return {
