@@ -3,7 +3,6 @@ from functools import cached_property
 import httpx
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-from proxy_requests import ProxyRequests
 
 from src.config.base_service import BaseService
 from src.util.injection import dependency, inject
