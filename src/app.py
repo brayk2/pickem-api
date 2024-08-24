@@ -23,6 +23,12 @@ from src.config.logger import Logger
 app = FastAPI(title="PickEm Api", version="0.0.1", root_path="/")
 logger = Logger()
 
+
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
