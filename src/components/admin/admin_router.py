@@ -12,13 +12,13 @@ from src.models.dto.admin_dtos import ApiQuota
 from src.models.dto.group_dto import CreateGroupRequest, CreateGroupResponse
 from src.models.new_db_models import GameModel, SpreadModel, GroupModel
 
-admin_router = APIRouter(
-    prefix="/admin", tags=["Admin"], dependencies=[Depends(PermissionChecker.admin)]
-)
+admin_router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
 @admin_router.post("/group", response_model=CreateGroupResponse)
-async def create_group(request: CreateGroupRequest):
+async def create_group(
+    request: CreateGroupRequest, _: DecodedToken = Depends(PermissionChecker.admin)
+):
     model = GroupModel.create(name=request.name, description=request.description)
     return model_to_dict(model)
 
