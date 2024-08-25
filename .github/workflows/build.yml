@@ -26,6 +26,10 @@ jobs:
           poetry run python --version
           poetry install --no-interaction --no-ansi
           poetry build
+          # Install dependencies into the package directory
+          mkdir -p package
+          poetry run pip install --upgrade --target package --requirement <(poetry export --without-hashes -f requirements.txt)
+          # Package the function code and dependencies
           poetry run pip install --upgrade --target package  dist/*.whl 
           cd package && zip -r ../artifact.zip . -x '*.pyc'
 
