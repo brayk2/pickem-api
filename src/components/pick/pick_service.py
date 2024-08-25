@@ -235,6 +235,7 @@ class PickService(BaseService):
                     thumbnail=game.away_team.thumbnail,
                 ),
                 start_time=game.start_time,
+                start_date=game.start_date,
                 # Add other necessary fields here based on your MatchupDto structure
                 lines={
                     game.home_team.name: f"{pick.spread_value:.1f}".rstrip("0").rstrip(
