@@ -26,7 +26,7 @@ async def get_current_week_and_year(
 async def set_current_week(
     week: int,
     season_service: SeasonService = Depends(SeasonService.create),
-    _=Depends(PermissionChecker.admin),
+    _=Depends(PermissionChecker.commissioner),
 ):
     """
     Sets the current week in the property table under the 'season' category.
@@ -49,7 +49,7 @@ async def get_current_year(
 async def set_current_year(
     year: int,
     season_service: SeasonService = Depends(SeasonService.create),
-    _=Depends(PermissionChecker.admin),
+    _=Depends(PermissionChecker.commissioner),
 ):
     """
     Sets the current year in the property table under the 'season' category.
