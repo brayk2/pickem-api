@@ -5,6 +5,7 @@ from src.components.admin.admin_exception import (
     PropertyNotFoundException,
 )
 from src.components.admin.admin_service import AdminService
+from src.components.auth.auth_models import DecodedToken
 from src.components.auth.permission_checker import PermissionChecker
 from src.config.logger import Logger
 from src.models.dto.admin_dtos import ApiQuota
@@ -16,30 +17,6 @@ admin_router = APIRouter(
 )
 
 
-@admin_router.post("/create-table")
-async def create_table():
-    GameModel.create_table()
-    SpreadModel.create_table()
-
-    GameModel.select()
-    SpreadModel.select()
-    return {
-        "msg": f"Successfully created table: {GameModel.__name__}, {SpreadModel.__name__}"
-    }
-
-
-@admin_router.get("/books", response_model=list[str])
-async def get_books(logger: Logger = Depends(Logger)):
-    query = (
-        SpreadModel.select(SpreadModel.bookmaker)
-        .distinct()
-        .order_by(SpreadModel.bookmaker)
-    )
-
-    logger.info(f"query: {query.sql()}")
-    return [model.bookmaker for model in query]
-
-
 @admin_router.post("/group", response_model=CreateGroupResponse)
 async def create_group(request: CreateGroupRequest):
     model = GroupModel.create(name=request.name, description=request.description)
@@ -49,6 +26,7 @@ async def create_group(request: CreateGroupRequest):
 @admin_router.get("/api-quota", response_model=ApiQuota)
 async def get_quota(
     admin_service: AdminService = Depends(AdminService.create),
+    _: DecodedToken = Depends(PermissionChecker.commissioner),
     # logger: Logger = Depends(Logger),
 ):
     """Gets the odds API quota."""
