@@ -20,7 +20,7 @@ from src.components.user.user_router import user_router
 from src.components.season.season_router import season_router
 from src.config.logger import Logger
 
-app = FastAPI(title="PickEm Api", version="0.0.1", root_path="/")
+app = FastAPI(title="PickEm Api", version="0.0.1", root_path="/api")
 logger = Logger()
 
 
@@ -76,4 +76,4 @@ async def exception_handling_middleware(request: Request, call_next):
 # app.include_router(api)
 app.include_router(ping_router)
 
-handler = Mangum(app, api_gateway_base_path="/")
+handler = Mangum(app, api_gateway_base_path="/api")
