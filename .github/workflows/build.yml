@@ -30,7 +30,7 @@ jobs:
           poetry run python --version
           poetry install --no-interaction --no-ansi
           poetry build
-          poetry run pip install --platform manylinux2014_x86_64 --python-version=3.11 --only-binary=:all: --target package --upgrade  dist/*.whl 
+          poetry run pip install --upgrade --platform manylinux2014_x86_64 --python-version=3.11 --only-binary=:all: --target package  dist/*.whl 
           cd package && zip -r ../artifact.zip . -x '*.pyc'
 
       - name: 'Configure AWS Credentials'
