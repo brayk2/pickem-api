@@ -1,8 +1,8 @@
 import bcrypt
 
-from src.config.logger import get_logger
+from src.config.logger import Logger
 
-logger = get_logger(__name__)
+logger = Logger()
 
 
 class PasswordManager:

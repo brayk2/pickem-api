@@ -5,11 +5,11 @@ import boto3
 import pytz
 from botocore.exceptions import ClientError
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from src.components.auth.auth_models import DecodedToken, TokenResponse
 from src.components.auth.auth_exceptions import InvalidTokenException
 from src.config.base_service import BaseService
 from src.config.settings import Settings
+from src.services.password_manager import PasswordManager
 from src.util.injection import dependency
 import os
 
@@ -56,7 +56,6 @@ class OAuthService(BaseService):
         self.algorithm = algorithm
         self.access_token_expire_minutes = access_token_expire_minutes
         self.refresh_token_expire_days = refresh_token_expire_days
-        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """
@@ -66,7 +65,7 @@ class OAuthService(BaseService):
         :param hashed_password: The hashed password to compare against.
         :return: True if the password matches, False otherwise.
         """
-        return self.pwd_context.verify(plain_password, hashed_password)
+        return PasswordManager.verify_password(plain_password, hashed_password)
 
     def get_password_hash(self, password: str) -> str:
         """
@@ -75,7 +74,7 @@ class OAuthService(BaseService):
         :param password: The plain text password to hash.
         :return: The hashed password.
         """
-        return self.pwd_context.hash(password)
+        return PasswordManager.hash_password(password)
 
     def create_access_token(self, payload: DecodedToken) -> tuple[str, dict]:
         """
