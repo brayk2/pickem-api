@@ -53,27 +53,26 @@ async def exception_handling_middleware(request: Request, call_next):
 
 
 # api = APIRouter(prefix="/api")
-#
-# # new component structure
+
+# new component structure
+app.include_router(auth_router)
+app.include_router(season_router)
+app.include_router(user_router)
+app.include_router(roles_router)
+app.include_router(results_router)
+app.include_router(standings_router)
+
+# old route structure
 # api.include_router(auth_router)
-# api.include_router(season_router)
-# api.include_router(user_router)
-# api.include_router(roles_router)
-# api.include_router(results_router)
-# api.include_router(standings_router)
-#
-# # old route structure
-# # api.include_router(auth_router)
-# # api.include_router(users_router)
-# api.include_router(picks_router)
-# api.include_router(admin_router)
-# api.include_router(spread_router)
-# api.include_router(game_router)
-# api.include_router(team_router)
-# api.include_router(scrape_router)
-#
-# # api and ping routers
-# app.include_router(api)
+# api.include_router(users_router)
+app.include_router(picks_router)
+app.include_router(admin_router)
+app.include_router(spread_router)
+app.include_router(game_router)
+app.include_router(team_router)
+app.include_router(scrape_router)
+
+# ping router
 app.include_router(ping_router)
 
 handler = Mangum(app, api_gateway_base_path="/api")
