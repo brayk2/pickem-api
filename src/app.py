@@ -20,7 +20,7 @@ from src.components.user.user_router import user_router
 from src.components.season.season_router import season_router
 from src.config.logger import Logger
 
-app = FastAPI(title="PickEm Api", version="0.0.1", root_path="/")
+app = FastAPI(title="PickEm Api", version="0.0.1", root_path="/api")
 logger = Logger()
 
 
@@ -57,28 +57,28 @@ async def exception_handling_middleware(request: Request, call_next):
         )
 
 
-api = APIRouter(prefix="/api")
-
-# new component structure
-api.include_router(auth_router)
-api.include_router(season_router)
-api.include_router(user_router)
-api.include_router(roles_router)
-api.include_router(results_router)
-api.include_router(standings_router)
-
-# old route structure
+# api = APIRouter(prefix="/api")
+#
+# # new component structure
 # api.include_router(auth_router)
-# api.include_router(users_router)
-api.include_router(picks_router)
-api.include_router(admin_router)
-api.include_router(spread_router)
-api.include_router(game_router)
-api.include_router(team_router)
-api.include_router(scrape_router)
-
-# api and ping routers
-app.include_router(api)
+# api.include_router(season_router)
+# api.include_router(user_router)
+# api.include_router(roles_router)
+# api.include_router(results_router)
+# api.include_router(standings_router)
+#
+# # old route structure
+# # api.include_router(auth_router)
+# # api.include_router(users_router)
+# api.include_router(picks_router)
+# api.include_router(admin_router)
+# api.include_router(spread_router)
+# api.include_router(game_router)
+# api.include_router(team_router)
+# api.include_router(scrape_router)
+#
+# # api and ping routers
+# app.include_router(api)
 app.include_router(ping_router)
 
-handler = Mangum(app)
+handler = Mangum(app, api_gateway_base_path="/api")
