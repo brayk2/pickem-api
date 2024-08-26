@@ -1,4 +1,6 @@
 from peewee import PostgresqlDatabase
+
+from src.config.logger import Logger
 from src.config.settings import Settings
 
 
@@ -13,7 +15,11 @@ def get_database() -> PostgresqlDatabase:
     )
 
 
+logger = Logger()
+
+
 def get_new_database() -> PostgresqlDatabase:
+    logger.info("getting database connection")
     settings = Settings()
     return PostgresqlDatabase(
         settings.db_name,
