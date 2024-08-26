@@ -30,6 +30,5 @@ def get_new_database() -> PostgresqlDatabase:
         password=settings.db_pass,
         max_connections=20,
         stale_timeout=900,
-        connection_timeout=900,
         sslmode="require",
     )
