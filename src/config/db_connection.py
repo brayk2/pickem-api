@@ -29,7 +29,7 @@ def get_new_database() -> PostgresqlDatabase:
         user=settings.db_user,
         password=settings.db_pass,
         max_connections=20,
-        stale_timeout=None,
-        connection_timeout=None,
+        stale_timeout=900,
+        connection_timeout=900,
         sslmode="require",
     )
