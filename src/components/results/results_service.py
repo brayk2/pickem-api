@@ -106,12 +106,12 @@ class ResultsService(BaseService):
             try:
                 is_correct = (
                     pick["selected_team_id"] == pick["home_team_id"]
-                    and pick["home_team_score"]
-                    > pick["away_team_score"] + pick["spread_value"]
+                    and (pick["home_team_score"] + pick["spread_value"])
+                    > pick["away_team_score"]
                 ) or (
                     pick["selected_team_id"] == pick["away_team_id"]
-                    and pick["away_team_score"]
-                    > pick["home_team_score"] + pick["spread_value"]
+                    and (pick["away_team_score"] + pick["spread_value"])
+                    > pick["home_team_score"]
                 )
             except Exception as e:
                 self.logger.exception(e)
@@ -141,7 +141,7 @@ class ResultsService(BaseService):
                     confidence=pick["confidence"],
                     spread_value=pick["spread_value"],
                     status=pick["status"],
-                    game=GameDto(
+                    game=MatchupDto(
                         game_id=pick["game_id"],
                         home_team=TeamDto(
                             team_id=pick["home_team_id"],

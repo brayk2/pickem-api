@@ -37,44 +37,12 @@ class GameDto(BaseDto):
     year: int | None = Field(default=None)
 
 
-class PickDto(BaseDto):
-    id: int
-    team: TeamDto = Field(alias="team")
-    confidence: int
-    spread_value: float = Field(alias="line")
-    status: str
-    game: GameDto = Field(alias="game")
-    score: int | None = Field(default=None)
-    is_correct: bool | None = Field(alias="isCorrect", default=None)
-
-
-class UserPickResultsDto(BaseDto):
-    username: str
-    picks: List[PickDto]
-    total_score: int = Field(alias="totalScore")
-    rank: int | None = Field(default=None)
-
-
-class LeaguePickResultsDto(BaseDto):
-    username: str
-    total_score: int
-    rank: int
-
-
-class ResultsResponseDto(BaseDto):
-    year: int
-    week: int
-    user_results: List[UserPickResultsDto] = Field(alias="userResults")
-    league_results: List[LeaguePickResultsDto] = Field(alias="leagueResults")
-    nfl_game_results: List[GameResultDto] = Field(alias="nflGameResults")
-
-
 class MatchupDto(BaseDto):
     game_id: int
     home_team: TeamDto
     away_team: TeamDto
-    start_time: time
-    start_date: date
+    start_time: time | None = None
+    start_date: date | None = None
 
     lines: dict[str, str] | None = Field(default_factory=dict)
     ats: dict[str, str] | None = Field(default_factory=dict)
@@ -100,6 +68,38 @@ class MatchupDto(BaseDto):
             return None
 
         return val
+
+
+class PickDto(BaseDto):
+    id: int
+    team: TeamDto = Field(alias="team")
+    confidence: int
+    spread_value: float = Field(alias="line")
+    status: str
+    game: MatchupDto = Field(alias="game")
+    score: int | None = Field(default=None)
+    is_correct: bool | None = Field(alias="isCorrect", default=None)
+
+
+class UserPickResultsDto(BaseDto):
+    username: str
+    picks: List[PickDto]
+    total_score: int = Field(alias="totalScore")
+    rank: int | None = Field(default=None)
+
+
+class LeaguePickResultsDto(BaseDto):
+    username: str
+    total_score: int
+    rank: int
+
+
+class ResultsResponseDto(BaseDto):
+    year: int
+    week: int
+    user_results: List[UserPickResultsDto] = Field(alias="userResults")
+    league_results: List[LeaguePickResultsDto] = Field(alias="leagueResults")
+    nfl_game_results: List[GameResultDto] = Field(alias="nflGameResults")
 
 
 class WeekResultsDto(BaseDto):
