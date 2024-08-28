@@ -1,7 +1,9 @@
-from pydantic import BaseModel, EmailStr, ConfigDict, Field, computed_field
+from pydantic import EmailStr, ConfigDict, Field, computed_field
+
+from src.models.base_models import BaseDto
 
 
-class CreateUserDto(BaseModel):
+class CreateUserDto(BaseDto):
     username: str
     email: str
     password: str
@@ -9,29 +11,36 @@ class CreateUserDto(BaseModel):
     last_name: str | None = None
 
 
-class UpdateUserRequest(BaseModel):
+class UpdateUserRequest(BaseDto):
     username: str | None = None
     first_name: str | None = None
     last_name: str | None = None
 
 
-class UpdateUserPasswordRequest(BaseModel):
+class UpdateUserPasswordRequest(BaseDto):
     old_password: str
     new_password: str
 
 
-class AddRoleDto(BaseModel):
+class AddRoleDto(BaseDto):
     username: str
     role: str
 
 
-class UserDto(BaseModel):
+class UserDto(BaseDto):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     username: str
+    first_name: str | None = Field(default=None)
+    last_name: str | None = Field(default=None)
     email: EmailStr
     groups: list[str] | None = Field(exclude=True, default_factory=list)
+
+    @computed_field
+    @property
+    def name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
 
     @computed_field(alias="isAdmin")
     @property

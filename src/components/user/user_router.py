@@ -23,6 +23,8 @@ async def create_user(
     _: DecodedToken = Depends(PermissionChecker.commissioner),
 ):
     user = user_service.create_user(
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
         username=user_data.username,
         email=user_data.email,
         password_hash=oauth_service.get_password_hash(password=user_data.password),

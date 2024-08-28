@@ -75,10 +75,19 @@ class UserService(BaseService):
         decoded_token = self.oauth_service.decode_token(encoded_token)
         return self.validate_user_from_decoded_token(decoded_token)
 
-    def create_user(self, username: str, email: str, password_hash: str) -> UserModel:
+    def create_user(
+        self,
+        first_name: str,
+        last_name: str,
+        username: str,
+        email: str,
+        password_hash: str,
+    ) -> UserModel:
         """
         Creates a new user and assigns the default role.
 
+        :param first_name: The first name for the new user.
+        :param last_name: The last name for the new user.
         :param username: The username for the new user.
         :param email: The email for the new user.
         :param password_hash: The hashed password for the new user.
@@ -88,6 +97,11 @@ class UserService(BaseService):
         user = UserModel.create(
             username=username, email=email, password_hash=password_hash
         )
+
+        user.first_name = first_name
+        user.last_name = last_name
+        user.save()
+
         self.logger.info(f"Assigning default role to user: {username}")
         default_role = self.roles_service.get_default_role()
         self.add_user_to_role(username=user.username, role_name=default_role.name)
@@ -202,12 +216,9 @@ class UserService(BaseService):
             self.logger.info(f"Found user '{username}'")
             roles = self.roles_service.get_roles_for_user(user=user)
 
-            return UserDto(
-                id=user.id,
-                username=user.username,
-                email=user.email,
-                groups=roles,
-            )
+            user_dto = UserDto.model_validate(user)
+            user_dto.groups = roles
+            return user_dto
 
         self.logger.error(f"User '{username}' not found.")
         raise UserNotFoundException(username=username)

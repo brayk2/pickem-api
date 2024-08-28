@@ -17,10 +17,12 @@ from playhouse.shortcuts import model_to_dict
 
 from src.config.db_connection import get_new_database
 
+database = get_new_database()
+
 
 class BaseModel(Model):
     class Meta:
-        database = get_new_database()
+        database = database
 
     system_user = "system"
     id: BigAutoField = BigAutoField()

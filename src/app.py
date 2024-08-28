@@ -19,6 +19,7 @@ from src.components.standings.standings_router import standings_router
 from src.components.user.user_router import user_router
 from src.components.season.season_router import season_router
 from src.config.logger import Logger
+from src.models.new_db_models import database
 
 app = FastAPI(title="PickEm Api", version="0.0.1", root_path="/api")
 logger = Logger()
@@ -36,7 +37,11 @@ app.add_middleware(
 @app.middleware("http")
 async def exception_handling_middleware(request: Request, call_next):
     try:
-        return await call_next(request)
+        if database.is_closed() or not database.is_connection_usable():
+            logger.info(f"connecting to database: {request.url}")
+            database.connect()
+
+        response = await call_next(request)
     except StarletteHTTPException as exc:
         logger.exception(exc)
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
@@ -48,8 +53,13 @@ async def exception_handling_middleware(request: Request, call_next):
     except Exception as exc:
         logger.exception(exc)
         return JSONResponse(
-            status_code=500, content={"detail": "An unexpected error occurred."}
+            status_code=500, content={"detail": f"An unexpected error occurred: {exc}"}
         )
+    finally:
+        logger.info(f"closing database connection: {request.url}")
+        database.close()
+
+    return response
 
 
 # api = APIRouter(prefix="/api")

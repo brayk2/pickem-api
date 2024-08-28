@@ -25,6 +25,7 @@ def get_new_database() -> PostgresqlDatabase:
     settings = Settings()
     return PooledPostgresqlDatabase(
         settings.db_name,
+        thread_safe=True,
         host=settings.db_host,
         user=settings.db_user,
         password=settings.db_pass,
