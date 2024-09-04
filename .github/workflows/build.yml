@@ -36,7 +36,7 @@ jobs:
         id: check_release_exists
         run: |
           release_file="${{ env.project_version }}-release.zip"
-          if aws s3 ls s3://${{ AWS_BUCKET }}/$release_file; then
+          if aws s3 ls s3://$AWS_BUCKET/$release_file; then
             echo "Error: Release ${release_file} already exists. Please bump the version before proceeding."
             exit 1
           else
@@ -90,4 +90,4 @@ jobs:
           aws-region: us-east-1
 
       - name: 'Upload to S3 with Tags'
-        run: aws s3 cp ${{ env.artifact_name }} s3://${{ AWS_BUCKET }}/ --tagging ${{ env.artifact_tag }}
+        run: aws s3 cp ${{ env.artifact_name }} s3://$AWS_BUCKET/ --tagging ${{ env.artifact_tag }}

@@ -38,8 +38,8 @@ jobs:
       - name: 'Update Lambda Function with S3 Object Name'
         run: |
           aws lambda update-function-code \
-            --function-name=${{ AWS_LAMBDA }} \
-            --s3-bucket=${{ AWS_BUCKET }} \
+            --function-name=$AWS_LAMBDA \
+            --s3-bucket=$AWS_BUCKET \
             --s3-key=${{ env.s3_object_name }} \
             --cli-read-timeout 60 \
             --cli-connect-timeout 60
