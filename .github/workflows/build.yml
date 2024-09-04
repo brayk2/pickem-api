@@ -3,14 +3,13 @@ name: 'Build'
 on:
   push:
     branches:
-      - master
-      - development
+      - main
       - feature/*
 
   pull_request:
     branches:
-      - master
-      - development
+      - main
+      - feature/*
 
 env:
   AWS_BUCKET: "pickem-api"
@@ -63,15 +62,15 @@ jobs:
             branch_suffix=$(echo "${branch_name}" | sed 's|feature/||')
             artifact_name="${{ env.project_version }}-${branch_suffix}-snapshot.zip"
             artifact_tag="version=snapshot"
-          elif [[ "${branch_name}" == development ]]; then
-            timestamp=$(date +'%Y%m%d%H%M%S')
-            artifact_name="${{ env.project_version }}-rc-${timestamp}.zip"
-            artifact_tag="version=rc"
-          elif [[ "${branch_name}" == master ]]; then
+#          elif [[ "${branch_name}" == development ]]; then
+#            timestamp=$(date +'%Y%m%d%H%M%S')
+#            artifact_name="${{ env.project_version }}-rc-${timestamp}.zip"
+#            artifact_tag="version=rc"
+          elif [[ "${branch_name}" == main ]]; then
             artifact_name="${{ env.project_version }}-release.zip"
             artifact_tag="version=release"
           else
-            echo "Invalid branch naming does not match feature/*, development, or master"
+            echo "Invalid branch naming does not match feature/* or main"
             exit 1
           fi
 
