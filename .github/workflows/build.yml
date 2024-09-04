@@ -95,5 +95,5 @@ jobs:
       - name: 'Add Tags to S3 Object'
         run: |
           aws s3api put-object-tagging --bucket ${{ env.AWS_BUCKET }} --key ${{ env.artifact_name }} \
-            --tagging '{"TagSet":[{"Key":"version","Value":${{ env.artifact_tag }}}]}'
+            --tagging '{"TagSet":[{"Key":"version","Value":"${{ env.artifact_tag }}"}]}'
 
