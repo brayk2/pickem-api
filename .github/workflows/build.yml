@@ -36,7 +36,7 @@ jobs:
             echo "No release found, proceeding with current version."
           fi
 
-      - name: 'Determine Artifact Name'
+      - name: 'Determine Artifact Name and Tag'
         id: determine_artifact_name
         run: |
           branch_name=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
@@ -44,13 +44,17 @@ jobs:
           if [[ "${branch_name}" == feature/* ]]; then
             branch_suffix=$(echo "${branch_name}" | sed 's|feature/||')
             echo "artifact_name=${{ env.project_version }}-${branch_suffix}-snapshot.zip" >> $GITHUB_ENV
+            echo "artifact_tag=version=snapshot" >> $GITHUB_ENV
           elif [[ "${branch_name}" == development ]]; then
             timestamp=$(date +'%Y%m%d%H%M%S')
             echo "artifact_name=${{ env.project_version }}-rc-${timestamp}.zip" >> $GITHUB_ENV
+            echo "artifact_tag=version=rc" >> $GITHUB_ENV
           elif [[ "${branch_name}" == master ]]; then
             echo "artifact_name=${{ env.project_version }}-release.zip" >> $GITHUB_ENV
+            echo "artifact_tag=version=release" >> $GITHUB_ENV
           else
             echo "artifact_name=artifact.zip" >> $GITHUB_ENV
+            echo "artifact_tag=version=unknown" >> $GITHUB_ENV
 
       - name: 'Create Package'
         id: 'create_package'
@@ -69,5 +73,5 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: 'Upload to S3'
-        run: aws s3 cp ${{ env.artifact_name }} s3://${{ secrets.AWS_BUCKET }}/
+      - name: 'Upload to S3 with Tags'
+        run: aws s3 cp ${{ env.artifact_name }} s3://${{ secrets.AWS_BUCKET }}/ --tagging ${{ env.artifact_tag }}
