@@ -32,7 +32,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: arn:aws:iam::881413588329:role/Pickem_GithubActions
+          role-to-assume: arn:aws:iam::881413588329:role/Pickem_Deployer
           aws-region: us-east-1
 
       - name: 'Update Lambda Function with S3 Object Name'
