@@ -80,7 +80,7 @@ jobs:
           echo "${{ env.artifact_name }}" > s3_object_name.txt
 
       - name: 'Upload Step Data as Artifact'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: s3-object-name
           path: s3_object_name.txt
