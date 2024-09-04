@@ -78,6 +78,7 @@ jobs:
 
           # Save the S3 object name to a file
           echo "${{ env.artifact_name }}" > s3_object_name.txt
+          cat s3_object_name.txt
 
       - name: 'Upload Step Data as Artifact'
         uses: actions/upload-artifact@v4
