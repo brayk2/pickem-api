@@ -40,7 +40,7 @@ jobs:
         id: determine_artifact_name
         run: |
           branch_name=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
-          
+
           if [[ "${branch_name}" == feature/* ]]; then
             branch_suffix=$(echo "${branch_name}" | sed 's|feature/||')
             echo "artifact_name=${{ env.project_version }}-${branch_suffix}-snapshot.zip" >> $GITHUB_ENV
@@ -55,18 +55,18 @@ jobs:
           else
             echo "Invalid branch naming does not match feature/*, development, or master"
             exit 1
-          
+
           # Save the S3 object name to a file
           echo "${{ env.artifact_name }}" > s3_object_name.txt
 
-          - name: 'Upload Step Data as Artifact'
-            uses: actions/upload-artifact@v3
-            with:
-              name: s3-object-name
-              path: s3_object_name.txt
+      - name: 'Upload Step Data as Artifact'
+        uses: actions/upload-artifact@v3
+        with:
+          name: s3-object-name
+          path: s3_object_name.txt
 
       - name: 'Create Package'
-        id: 'create_package'
+        id: create_package
         run: |
           poetry --version
           poetry run python --version
