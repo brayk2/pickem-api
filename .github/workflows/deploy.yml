@@ -23,11 +23,11 @@ jobs:
           s3_object_name=$(cat s3_object_name.txt)
           echo "s3_object_name=${s3_object_name}" >> $GITHUB_ENV
 
-      - name: 'Configure AWS Credentials'
-        uses: aws-actions/configure-aws-credentials@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::881413588329:role/Pickem_GithubActions
           aws-region: us-east-1
 
       - name: 'Update Lambda Function with S3 Object Name'
