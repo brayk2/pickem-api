@@ -19,15 +19,24 @@ jobs:
         with:
           version: latest
 
+      - name: 'Extract Version'
+        id: extract_version
+        run: |
+          version=$(poetry version --short)
+          echo "project_version=${version}" >> $GITHUB_ENV
+
       - name: 'Determine Artifact Name'
         id: determine_artifact_name
         run: |
-          if [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
-            echo "artifact_name=artifact-snapshot.zip" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == refs/heads/development ]]; then
-            echo "artifact_name=artifact-rc.zip" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == refs/heads/master ]]; then
-            echo "artifact_name=artifact-release.zip" >> $GITHUB_ENV
+          branch_name=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
+          
+          if [[ "${branch_name}" == feature/* ]]; then
+            branch_suffix=$(echo "${branch_name}" | sed 's|feature/||')
+            echo "artifact_name=${{ env.project_version }}-${branch_suffix}-snapshot.zip" >> $GITHUB_ENV
+          elif [[ "${branch_name}" == development ]]; then
+            echo "artifact_name=${{ env.project_version }}-rc.zip" >> $GITHUB_ENV
+          elif [[ "${branch_name}" == master ]]; then
+            echo "artifact_name=${{ env.project_version }}-release.zip" >> $GITHUB_ENV
           else
             echo "artifact_name=artifact.zip" >> $GITHUB_ENV
           fi
