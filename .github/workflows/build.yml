@@ -1,14 +1,12 @@
 name: 'Build'
 
 on:
-  # Run the workflow on push to specific branches
   push:
     branches:
       - master
       - development
-      - feature/*   # Optional: Add specific branches or patterns
+      - feature/*
 
-  # Run the workflow on pull requests targeting specific branches
   pull_request:
     branches:
       - master
@@ -18,8 +16,8 @@ env:
   AWS_BUCKET: "pickem-api"
 
 permissions:
-  id-token: write # This is required for requesting the JWT
-  contents: read  # This is required for actions/checkout
+  id-token: write
+  contents: read
 
 jobs:
   Build:
@@ -48,7 +46,7 @@ jobs:
         id: check_release_exists
         run: |
           release_file="${{ env.project_version }}-release.zip"
-          if aws s3 ls s3://{{ env.AWS_BUCKET }}/$release_file; then
+          if aws s3 ls s3://${{ env.AWS_BUCKET }}/$release_file; then
             echo "Error: Release ${release_file} already exists. Please bump the version before proceeding."
             exit 1
           else
@@ -85,28 +83,3 @@ jobs:
         with:
           name: s3-object-name
           path: s3_object_name.txt
-
-      - name: 'Create Package'
-        id: create_package
-        run: |
-          poetry --version
-          poetry run python --version
-          poetry install --no-interaction --no-ansi
-          poetry build
-          poetry run pip install --upgrade --target package dist/*.whl
-          cd package && zip -r ../${{ env.artifact_name }} . -x '*.pyc'
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          role-to-assume: arn:aws:iam::881413588329:role/Pickem_Deployer
-          aws-region: us-east-1
-
-      - name: 'Upload to S3'
-        run: aws s3 cp ${{ env.artifact_name }} s3://${{ env.AWS_BUCKET }}/
-
-      - name: 'Add Tags to S3 Object'
-        run: |
-          aws s3api put-object-tagging --bucket ${{ env.AWS_BUCKET }} --key ${{ env.artifact_name }} \
-            --tagging '{"TagSet":[{"Key":"version","Value":"${{ env.artifact_tag }}"}]}'
-
