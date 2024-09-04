@@ -25,6 +25,17 @@ jobs:
           version=$(poetry version --short)
           echo "project_version=${version}" >> $GITHUB_ENV
 
+      - name: 'Check if Release Exists'
+        id: check_release_exists
+        run: |
+          release_file="${{ env.project_version }}-release.zip"
+          if aws s3 ls s3://${{ secrets.AWS_BUCKET }}/$release_file; then
+            echo "Error: Release ${release_file} already exists. Please bump the version before proceeding."
+            exit 1
+          else
+            echo "No release found, proceeding with current version."
+          fi
+
       - name: 'Determine Artifact Name'
         id: determine_artifact_name
         run: |
@@ -34,12 +45,12 @@ jobs:
             branch_suffix=$(echo "${branch_name}" | sed 's|feature/||')
             echo "artifact_name=${{ env.project_version }}-${branch_suffix}-snapshot.zip" >> $GITHUB_ENV
           elif [[ "${branch_name}" == development ]]; then
-            echo "artifact_name=${{ env.project_version }}-rc.zip" >> $GITHUB_ENV
+            timestamp=$(date +'%Y%m%d%H%M%S')
+            echo "artifact_name=${{ env.project_version }}-rc-${timestamp}.zip" >> $GITHUB_ENV
           elif [[ "${branch_name}" == master ]]; then
             echo "artifact_name=${{ env.project_version }}-release.zip" >> $GITHUB_ENV
           else
             echo "artifact_name=artifact.zip" >> $GITHUB_ENV
-          fi
 
       - name: 'Create Package'
         id: 'create_package'
