@@ -96,7 +96,7 @@ jobs:
           cd package && zip -r ../${{ env.artifact_name }} . -x '*.pyc'
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v3
         with:
           role-to-assume: arn:aws:iam::881413588329:role/Pickem_Deployer
           aws-region: us-east-1
