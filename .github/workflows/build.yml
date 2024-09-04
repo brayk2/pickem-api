@@ -6,11 +6,6 @@ on:
       - main
       - feature/*
 
-#  pull_request:
-#    branches:
-#      - main
-#      - feature/*
-
 env:
   AWS_BUCKET: "pickem-api"
   AWS_LAMBDA: "pickem-api"
