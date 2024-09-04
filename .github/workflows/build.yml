@@ -3,7 +3,7 @@ name: 'Build'
 on: [push]
 
 env:
-  AWS_BUCKET: "arn:aws:s3:::pickem-api"
+  AWS_BUCKET: "pickem-api"
 
 permissions:
   id-token: write # This is required for requesting the JWT

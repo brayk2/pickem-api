@@ -2,8 +2,8 @@ name: 'Deploy'
 
 
 env:
-  AWS_BUCKET: "arn:aws:s3:::pickem-api"
-  AWS_LAMBDA: "arn:aws:s3:::pickem-api"
+  AWS_BUCKET: "pickem-api"
+  AWS_LAMBDA: "pickem-api"
 
 on:
   workflow_run:
