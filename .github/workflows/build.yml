@@ -72,6 +72,5 @@ jobs:
           role-to-assume: arn:aws:iam::881413588329:role/Pickem_GithubActions
           aws-region: us-east-1
 
-
       - name: 'Upload to S3 with Tags'
         run: aws s3 cp ${{ env.artifact_name }} s3://${{ secrets.AWS_BUCKET }}/ --tagging ${{ env.artifact_tag }}
