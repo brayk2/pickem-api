@@ -92,7 +92,6 @@ jobs:
   Deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: 'Download S3 Object Name Artifact'
         uses: actions/download-artifact@v4
