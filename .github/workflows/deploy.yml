@@ -10,7 +10,19 @@ jobs:
   Deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
+      - name: 'Download S3 Object Name Artifact'
+        uses: actions/download-artifact@v3
+        with:
+          name: s3-object-name
+
+      - name: 'Read S3 Object Name'
+        id: read_s3_object_name
+        run: |
+          s3_object_name=$(cat s3_object_name.txt)
+          echo "s3_object_name=${s3_object_name}" >> $GITHUB_ENV
+
       - name: 'Configure AWS Credentials'
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -18,11 +30,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: 'Update Source Code'
+      - name: 'Update Lambda Function with S3 Object Name'
         run: |
           aws lambda update-function-code \
             --function-name=${{ secrets.AWS_LAMBDA_FUNCTION_NAME }} \
             --s3-bucket=${{ secrets.AWS_BUCKET }} \
-            --s3-key=artifact.zip \
+            --s3-key=${{ env.s3_object_name }} \
             --cli-read-timeout 60 \
             --cli-connect-timeout 60

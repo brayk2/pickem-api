@@ -53,8 +53,17 @@ jobs:
             echo "artifact_name=${{ env.project_version }}-release.zip" >> $GITHUB_ENV
             echo "artifact_tag=version=release" >> $GITHUB_ENV
           else
-            echo "artifact_name=artifact.zip" >> $GITHUB_ENV
-            echo "artifact_tag=version=unknown" >> $GITHUB_ENV
+            echo "Invalid branch naming does not match feature/*, development, or master"
+            exit 1
+          
+          # Save the S3 object name to a file
+          echo "${{ env.artifact_name }}" > s3_object_name.txt
+
+          - name: 'Upload Step Data as Artifact'
+            uses: actions/upload-artifact@v3
+            with:
+              name: s3-object-name
+              path: s3_object_name.txt
 
       - name: 'Create Package'
         id: 'create_package'
