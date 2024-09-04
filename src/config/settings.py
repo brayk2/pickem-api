@@ -1,13 +1,31 @@
 import os
-from pydantic_settings import BaseSettings
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+env = os.getenv("ENVIRONMENT", "dev")
+
+
+def get_resources_path() -> str:
+    parent = Path(__file__).parents[1]
+    return str(parent / "resources")
+
+
+def get_properties_file_path(config_type: str) -> tuple[str, str]:
+    return (
+        get_resources_path() + f"/{config_type}.properties",
+        get_resources_path() + f"/{config_type}.{env}.properties",
+    )
 
 
 class Settings(BaseSettings):
-    # TODO: hardcoded for now, should use config files
-    db_host: str = "ep-wild-wildflower-09765888-pooler.us-east-2.aws.neon.tech"
-    # db_host: str = "ep-wild-wildflower-09765888.us-east-2.aws.neon.tech"
-    db_name: str = "pickem_refactor"
+    model_config = SettingsConfigDict(
+        env_file=get_properties_file_path(config_type="app")
+    )
+
+    secret_path: str
+    db_host: str
+    db_name: str
     db_user: str = os.getenv("user", "_")
     db_pass: str = os.getenv("password", "_")
     odds_api_key: str = os.getenv("odds_api_key", "_")
-    secret_path: str = "dev/oauth"

@@ -19,6 +19,19 @@ jobs:
         with:
           version: latest
 
+      - name: 'Determine Artifact Name'
+        id: determine_artifact_name
+        run: |
+          if [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
+            echo "artifact_name=artifact-snapshot.zip" >> $GITHUB_ENV
+          elif [[ "${{ github.ref }}" == refs/heads/development ]]; then
+            echo "artifact_name=artifact-rc.zip" >> $GITHUB_ENV
+          elif [[ "${{ github.ref }}" == refs/heads/master ]]; then
+            echo "artifact_name=artifact-release.zip" >> $GITHUB_ENV
+          else
+            echo "artifact_name=artifact.zip" >> $GITHUB_ENV
+          fi
+
       - name: 'Create Package'
         id: 'create_package'
         run: |
@@ -26,8 +39,8 @@ jobs:
           poetry run python --version
           poetry install --no-interaction --no-ansi
           poetry build
-          poetry run pip install --upgrade --target package  dist/*.whl 
-          cd package && zip -r ../artifact.zip . -x '*.pyc'
+          poetry run pip install --upgrade --target package dist/*.whl
+          cd package && zip -r ../${{ env.artifact_name }} . -x '*.pyc'
 
       - name: 'Configure AWS Credentials'
         uses: aws-actions/configure-aws-credentials@v4
@@ -37,4 +50,4 @@ jobs:
           aws-region: us-east-1
 
       - name: 'Upload to S3'
-        run: aws s3 cp artifact.zip s3://${{ secrets.AWS_BUCKET }}/
+        run: aws s3 cp ${{ env.artifact_name }} s3://${{ secrets.AWS_BUCKET }}/

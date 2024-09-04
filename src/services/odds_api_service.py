@@ -101,7 +101,15 @@ class OddsApiService(BaseService):
             self.logger.info(f"failed to save api quota : {e}")
 
     @validate_response(model=list[OddsDto])
-    def fetch_odds(self) -> list[OddsDto]:
+    def fetch_odds(
+        self, start_date: datetime.datetime, end_date: datetime.datetime
+    ) -> list[OddsDto]:
+        start_time = (
+            datetime.datetime.combine(start_date, datetime.time()).isoformat() + "Z"
+        )
+        end_time = (
+            datetime.datetime.combine(end_date, datetime.time()).isoformat() + "Z"
+        )
         response = self.client.get(
             url="odds",
             params={
@@ -109,6 +117,8 @@ class OddsApiService(BaseService):
                 "markets": "spreads",
                 "oddsFormat": "american",
                 "apiKey": self.settings.odds_api_key,
+                "commenceTimeFrom": start_time,
+                "commenceTimeTo": end_time,
             },
         )
         self.save_remaining(response=response)

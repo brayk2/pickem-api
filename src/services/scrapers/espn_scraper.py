@@ -71,9 +71,9 @@ class EspnScraper(BaseScraper):
             week = self.scrape_week(week=i + 1, year=year)
             self.logger.info(week)
             season[i + 1] = week
-            print(f"Finished Loading Week {i + 1}".center(80, "-"))
+            self.logger.info(f"Finished Loading Week {i + 1}".center(80, "-"))
 
-        print(f"Finished Loading Season {year}".center(80, "-"))
+        self.logger.info(f"Finished Loading Season {year}".center(80, "-"))
         return season
 
     def _save_schedule(self, year: int, season: dict):

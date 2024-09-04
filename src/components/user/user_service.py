@@ -82,6 +82,7 @@ class UserService(BaseService):
         username: str,
         email: str,
         password_hash: str,
+        groups: list[str] | None = None,
     ) -> UserModel:
         """
         Creates a new user and assigns the default role.
@@ -105,6 +106,10 @@ class UserService(BaseService):
         self.logger.info(f"Assigning default role to user: {username}")
         default_role = self.roles_service.get_default_role()
         self.add_user_to_role(username=user.username, role_name=default_role.name)
+
+        for group in groups or []:
+            self.add_user_to_role(username=user.username, role_name=group)
+
         self.logger.info(f"User '{username}' created successfully with default role.")
         return user
 

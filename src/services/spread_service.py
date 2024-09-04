@@ -32,11 +32,13 @@ class SpreadService(BaseService):
             (SpreadModel.game_id == game_id) & (SpreadModel.bookmaker == bookmaker)
         )
 
-    def load_spreads(self):
+    def load_spreads(self, start_date: datetime, end_date: datetime):
         season_model = SeasonModel.get(year=2024)
         self.logger.info(f"using season {season_model}")
 
-        response: list[OddsDto] = self.oddsapi_service.fetch_odds()
+        response: list[OddsDto] = self.oddsapi_service.fetch_odds(
+            start_date=start_date, end_date=end_date
+        )
         self.logger.info(f"found {len(response)} odds marker")
 
         for item in response:
@@ -320,4 +322,6 @@ class SpreadService(BaseService):
 
 if __name__ == "__main__":
     service = SpreadService()
-    service.load_spreads()
+    w = 1
+    week: WeekModel = WeekModel.get(week_number=w)
+    service.load_spreads(start_date=week.start_date, end_date=week.end_date)

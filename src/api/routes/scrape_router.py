@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
+
+from src.services.scrapers.espn_scraper import EspnScraper
 from src.services.scrapers.nfl_scraper import NflScraper
 from src.services.scrapers.pfr_scraper import PfrScraper
 
 pfr_scraper = PfrScraper()
+espn_scraper = EspnScraper()
 nfl_scraper = NflScraper()
 
 scrape_router = APIRouter(prefix="/scrape", tags=["Scraper"])
@@ -27,12 +30,12 @@ async def scape_teams():
 
 
 @scrape_router.post("/schedule", response_model=GenericResponse)
-async def scape_schedule(year: str = Query(default="2023")):
+async def scape_schedule(year: int = Query(default=2024)):
     try:
-        pfr_scraper.scrape_schedule(year=year)
+        espn_scraper.scrape_season(year=year)
         return {
             "error": False,
-            "message": f"Successfully scraped schedule from {pfr_scraper.base_url}",
+            "message": f"Successfully scraped schedule from {espn_scraper.base_url}",
         }
     except Exception as e:
         return {"error": True, "message": f"Failed to scrape schedule: {e}"}
