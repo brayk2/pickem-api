@@ -1,6 +1,18 @@
 name: 'Build'
 
-on: [push]
+on:
+  # Run the workflow on push to specific branches
+  push:
+    branches:
+      - master
+      - development
+      - feature/*   # Optional: Add specific branches or patterns
+
+  # Run the workflow on pull requests targeting specific branches
+  pull_request:
+    branches:
+      - master
+      - development
 
 env:
   AWS_BUCKET: "pickem-api"
