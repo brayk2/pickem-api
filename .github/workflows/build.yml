@@ -89,5 +89,11 @@ jobs:
           role-to-assume: arn:aws:iam::881413588329:role/Pickem_GithubActions
           aws-region: us-east-1
 
-      - name: 'Upload to S3 with Tags'
-        run: aws s3 cp ${{ env.artifact_name }} s3://${{ env.AWS_BUCKET }}/ --tagging ${{ env.artifact_tag }}
+      - name: 'Upload to S3'
+        run: aws s3 cp ${{ env.artifact_name }} s3://{{ env.AWS_BUCKET }}/
+
+      - name: 'Add Tags to S3 Object'
+        run: |
+          aws s3api put-object-tagging --bucket ${{ env.AWS_BUCKET }} --key ${{ env.artifact_name }} \
+            --tagging '{"TagSet":[{"Key":"version","Value":${{ env.artifact_tag }}}]}'
+
