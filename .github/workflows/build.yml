@@ -31,6 +31,12 @@ jobs:
         with:
           version: latest
 
+      - name: 'Configure AWS credentials'
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::881413588329:role/Pickem_Deployer
+          aws-region: us-east-1
+
       - name: 'Extract Version'
         id: extract_version
         run: |
@@ -97,12 +103,6 @@ jobs:
           poetry build
           poetry run pip install --upgrade --target package dist/*.whl
           cd package && zip -r ../${{ env.artifact_name }} . -x '*.pyc'
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          role-to-assume: arn:aws:iam::881413588329:role/Pickem_Deployer
-          aws-region: us-east-1
 
       - name: 'Upload to S3'
         run: aws s3 cp ${{ env.artifact_name }} s3://${{ env.AWS_BUCKET }}/
