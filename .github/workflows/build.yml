@@ -55,6 +55,7 @@ jobs:
           else
             echo "Invalid branch naming does not match feature/*, development, or master"
             exit 1
+          fi
 
           # Save the S3 object name to a file
           echo "${{ env.artifact_name }}" > s3_object_name.txt
