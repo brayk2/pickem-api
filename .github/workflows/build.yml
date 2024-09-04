@@ -89,6 +89,30 @@ jobs:
         with:
           name: s3-object-name
           path: s3_object_name.txt
+
+      - name: 'Create Package'
+        id: create_package
+        run: |
+          poetry --version
+          poetry run python --version
+          poetry install --no-interaction --no-ansi
+          poetry build
+          poetry run pip install --upgrade --target package dist/*.whl
+          cd package && zip -r ../${{ env.artifact_name }} . -x '*.pyc'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::881413588329:role/Pickem_Deployer
+          aws-region: us-east-1
+
+      - name: 'Upload to S3'
+        run: aws s3 cp ${{ env.artifact_name }} s3://${{ env.AWS_BUCKET }}/
+
+      - name: 'Add Tags to S3 Object'
+        run: |
+          aws s3api put-object-tagging --bucket ${{ env.AWS_BUCKET }} --key ${{ env.artifact_name }} \
+            --tagging '{"TagSet":[{"Key":"version","Value":"${{ env.artifact_tag }}"}]}'
   Deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -105,7 +129,7 @@ jobs:
           echo "s3_object_name=${s3_object_name}" >> $GITHUB_ENV
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v3
         with:
           role-to-assume: arn:aws:iam::881413588329:role/Pickem_Deployer
           aws-region: us-east-1
