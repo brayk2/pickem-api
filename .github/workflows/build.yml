@@ -118,3 +118,5 @@ jobs:
             --s3-key=${{ env.s3_object_name }} \
             --cli-read-timeout 60 \
             --cli-connect-timeout 60
+
+    needs: Build
