@@ -56,8 +56,16 @@ jobs:
       - name: 'Determine Artifact Name and Tag'
         id: determine_artifact_name
         run: |
-          branch_name=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
+          # Check if this is a pull request event
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Use the head ref for pull request
+            branch_name="${{ github.event.pull_request.head.ref }}"
+          else
+            # Use the normal ref for branch pushes
+            branch_name=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
+          fi
 
+          # Determine artifact name based on the branch
           if [[ "${branch_name}" == feature/* ]]; then
             branch_suffix=$(echo "${branch_name}" | sed 's|feature/||')
             artifact_name="${{ env.project_version }}-${branch_suffix}-snapshot.zip"
