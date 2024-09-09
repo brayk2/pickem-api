@@ -5,8 +5,13 @@ from src.config.logger import Logger
 from src.config.settings import Settings
 
 
+logger = Logger()
+
+
 def get_database() -> PostgresqlDatabase:
     settings = Settings()
+    logger.info(f"db name = {settings.db_name}")
+
     return PooledPostgresqlDatabase(
         settings.db_name,
         host=settings.db_host,
@@ -23,6 +28,8 @@ logger = Logger()
 
 def get_new_database() -> PostgresqlDatabase:
     settings = Settings()
+    logger.info(f"db name = {settings.db_name}")
+
     return PooledPostgresqlDatabase(
         settings.db_name,
         thread_safe=True,

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pickem-api"
-version = "0.0.2"
+version = "0.0.3"
 description = "PickEm API"
 authors = ["Brayden Kness <brayk2@gmail.com>"]
 readme = "README.md"

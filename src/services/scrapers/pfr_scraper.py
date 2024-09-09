@@ -26,6 +26,43 @@ class PfrScraper(BaseScraper):
                 model.reference = team.get("href")
                 model.save()
 
+    def scrape_scores(self, year: str = "2023"):
+        season, _ = SeasonModel.get_or_create(year=year)
+
+        for i in range(18):
+            soup = self.get_soup(url=f"years/{year}/week_{i + 1}.htm")
+            summaries = soup.find_all("div", class_="game_summary")
+            for summary in summaries:
+                teams = summary.find("table", class_="teams")
+                _, away_row, home_row = teams.find_all("tr")
+
+                away, link = away_row.find_all("a")
+                home = home_row.find("a")
+
+                away = TeamModel.get(name=away.text.strip())
+                home = TeamModel.get(name=home.text.strip())
+
+                away_score = away_row.find("td", class_="right").text.strip()
+                home_score = home_row.find("td", class_="right").text.strip()
+
+                self.logger.info(f"creating game model {home} v {away}")
+                game, _ = GameModel.get_or_create(
+                    home_team=home, away_team=away, season=f"{i + 1}", season_id=season
+                )
+                game.reference = link.get("href")
+
+                if home_score and away_score:
+                    self.logger.info("scores found, loading results")
+                    results = game.results or ResultsModel()
+                    results.away_score = int(away_score)
+                    results.home_score = int(home_score)
+                    results.completed = link.text.strip().lower() == "final"
+                    results.save()
+
+                    game.results = results
+
+                game.save()
+
 
 if __name__ == "__main__":
     scraper = PfrScraper()

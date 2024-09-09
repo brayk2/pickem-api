@@ -108,7 +108,10 @@ class OddsApiService(BaseService):
             datetime.datetime.combine(start_date, datetime.time()).isoformat() + "Z"
         )
         end_time = (
-            datetime.datetime.combine(end_date, datetime.time()).isoformat() + "Z"
+            datetime.datetime.combine(
+                end_date + datetime.timedelta(days=1), datetime.time()
+            ).isoformat()
+            + "Z"
         )
         response = self.client.get(
             url="odds",
@@ -130,10 +133,15 @@ class OddsApiService(BaseService):
         response = self.client.get(
             url="scores",
             params={
-                "daysFrom": "3",
+                "daysFrom": "1",
                 "apiKey": self.settings.odds_api_key,
             },
         )
         self.save_remaining(response=response)
         response.raise_for_status()
         return response.json()
+
+
+if __name__ == "__main__":
+    scores = OddsApiService().fetch_scores()
+    print(scores)

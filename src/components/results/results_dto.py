@@ -7,12 +7,13 @@ from src.models.base_models import BaseDto
 
 
 class TeamDto(BaseDto):
-    team_id: int = Field(alias="teamId")
-    team_name: str = Field(alias="teamName")
-    team_city: str = Field(alias="teamCity")
-    thumbnail: str = Field(alias="thumbnail")
-    primary_color: str | None = Field(alias="teamPrimaryColor", default=None)
-    secondary_color: str | None = Field(alias="teamSecondaryColor", default=None)
+    team_id: int
+    team_name: str
+    team_city: str
+    abbreviation: str | None = None
+    thumbnail: str
+    primary_color: str | None = None
+    secondary_color: str | None = None
 
 
 class GameResultDto(BaseDto):
@@ -44,7 +45,7 @@ class MatchupDto(BaseDto):
     start_time: time | None = None
     start_date: date | None = None
 
-    lines: dict[str, str] | None = Field(default_factory=dict)
+    lines: dict[str, str | None] | None = Field(default_factory=dict)
     ats: dict[str, str] | None = Field(default_factory=dict)
     record: dict[str, str] | None = Field(default_factory=dict)
     results: dict[str, int] | None = Field(default=None)

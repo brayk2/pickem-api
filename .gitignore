@@ -6,3 +6,5 @@ build/
 poetry.lock
 
 *.sql
+
+prod_to_dev.sh

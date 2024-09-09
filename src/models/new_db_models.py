@@ -115,6 +115,7 @@ class WeekModel(BaseModel):
 class TeamModel(BaseModel):
     name = CharField()
     city = CharField()
+    abbreviation = CharField()
     thumbnail = CharField(null=True)
     primary_color = CharField(null=True, max_length=7)
     secondary_color = CharField(null=True, max_length=7)
