@@ -15,9 +15,9 @@ from peewee import (
 from playhouse.postgres_ext import JSONField
 from playhouse.shortcuts import model_to_dict
 
-from src.config.db_connection import get_new_database
+from src.config.db_connection import get_database
 
-database = get_new_database()
+database = get_database()
 
 
 class BaseModel(Model):

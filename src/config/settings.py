@@ -3,6 +3,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.util.injection import dependency
+
 env = os.getenv("ENVIRONMENT", "dev")
 
 
@@ -18,6 +20,7 @@ def get_properties_file_path(config_type: str) -> tuple[str, str]:
     )
 
 
+@dependency
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=get_properties_file_path(config_type="app")
