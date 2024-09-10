@@ -29,6 +29,6 @@ class Settings(BaseSettings):
     secret_path: str
     db_host: str
     db_name: str
-    db_user: str = os.getenv("user", "_")
-    db_pass: str = os.getenv("password", "_")
-    odds_api_key: str = os.getenv("odds_api_key", "_")
+    # db_user: str = os.getenv("user", "_")
+    # db_pass: str = os.getenv("password", "_")
+    # odds_api_key: str = os.getenv("odds_api_key", "_")

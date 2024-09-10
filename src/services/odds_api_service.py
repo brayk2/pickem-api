@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, TypeAdapter
 from src.components.admin.admin_service import AdminService
 from src.config.base_service import BaseService
 from src.services.property_service import PropertyService
+from src.services.secret_service import SecretService
 from src.util.injection import dependency, inject
 
 
@@ -78,16 +79,27 @@ class OddsDto(GameDto):
 @dependency
 class OddsApiService(BaseService):
     @inject
-    def __init__(self, admin_service: AdminService, property_service: PropertyService):
+    def __init__(
+        self,
+        admin_service: AdminService,
+        property_service: PropertyService,
+        secret_service: SecretService,
+    ):
         self.base_url = "https://api.the-odds-api.com/v4/sports/americanfootball_nfl"
         self.admin_service = admin_service
         self.property_service = property_service
+        self.secret_service = secret_service
 
     @property
     def client(self) -> httpx.Client:
         return httpx.Client(
             timeout=60, base_url=self.base_url, headers={"accept": "*/*"}
         )
+
+    @property
+    def api_key(self):
+        value = self.secret_service.get_secret("oddsapi/key")
+        return value.get("api-key")
 
     def save_remaining(self, response: httpx.Response):
         try:
@@ -119,7 +131,7 @@ class OddsApiService(BaseService):
                 "regions": "us",
                 "markets": "spreads",
                 "oddsFormat": "american",
-                "apiKey": self.settings.odds_api_key,
+                "apiKey": self.api_key,
                 "commenceTimeFrom": start_time,
                 "commenceTimeTo": end_time,
             },
@@ -134,7 +146,7 @@ class OddsApiService(BaseService):
             url="scores",
             params={
                 "daysFrom": "1",
-                "apiKey": self.settings.odds_api_key,
+                "apiKey": self.api_key,
             },
         )
         self.save_remaining(response=response)
