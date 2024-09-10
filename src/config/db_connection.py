@@ -18,7 +18,7 @@ def get_database() -> PostgresqlDatabase:
         settings.db_name,
         thread_safe=True,
         host=settings.db_host,
-        user=settings.db_user,
+        user=secret.get("username"),
         password=secret.get("password"),
         max_connections=20,
         stale_timeout=900,

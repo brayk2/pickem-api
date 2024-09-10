@@ -15,3 +15,7 @@ def handle_event(event, context):
     except Exception as e:
         logger.exception(f"failed to load spreads: {e}")
         raise e
+
+
+if __name__ == "__main__":
+    handle_event({}, {})
