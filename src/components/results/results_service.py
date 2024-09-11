@@ -103,8 +103,10 @@ class ResultsService(BaseService):
         user_results = {}
         for pick in picks:
             self.logger.debug(f"Processing pick: {pick}")
+            pick_status = ""
+
             try:
-                is_correct = (
+                if (
                     pick["selected_team_id"] == pick["home_team_id"]
                     and (pick["home_team_score"] + pick["spread_value"])
                     > pick["away_team_score"]
@@ -112,12 +114,36 @@ class ResultsService(BaseService):
                     pick["selected_team_id"] == pick["away_team_id"]
                     and (pick["away_team_score"] + pick["spread_value"])
                     > pick["home_team_score"]
-                )
+                ):
+                    pick_status = "COVERED"
+                elif (
+                    pick["selected_team_id"] == pick["home_team_id"]
+                    and (pick["home_team_score"] + pick["spread_value"])
+                    < pick["away_team_score"]
+                ) or (
+                    pick["selected_team_id"] == pick["away_team_id"]
+                    and (pick["away_team_score"] + pick["spread_value"])
+                    < pick["home_team_score"]
+                ):
+                    pick_status = "FAILED"
+                elif (
+                    pick["selected_team_id"] == pick["home_team_id"]
+                    and (pick["home_team_score"] + pick["spread_value"])
+                    == pick["away_team_score"]
+                ) or (
+                    pick["selected_team_id"] == pick["away_team_id"]
+                    and (pick["away_team_score"] + pick["spread_value"])
+                    == pick["home_team_score"]
+                ):
+                    pick_status = "PUSHED"
             except Exception as e:
                 self.logger.exception(e)
                 raise e
 
-            score = pick["confidence"] if is_correct else 0
+            multiplier = (
+                1 if pick_status == "COVERED" else 0.5 if pick_status == "PUSHED" else 0
+            )
+            score = pick.get("confidence", 0) * multiplier
 
             if pick["username"] not in user_results:
                 user_results[pick["username"]] = {
@@ -141,37 +167,8 @@ class ResultsService(BaseService):
                     confidence=pick["confidence"],
                     spread_value=pick["spread_value"],
                     status=pick["status"],
-                    game=MatchupDto(
-                        game_id=pick["game_id"],
-                        home_team=TeamDto(
-                            team_id=pick["home_team_id"],
-                            team_name=pick["home_team_name"],
-                            team_city=pick["home_team_city"],
-                            thumbnail=pick["home_team_thumbnail"],
-                            primary_color=pick["home_team_primary_color"],
-                            secondary_color=pick["home_team_secondary_color"],
-                        ),
-                        away_team=TeamDto(
-                            team_id=pick["away_team_id"],
-                            team_name=pick["away_team_name"],
-                            team_city=pick["away_team_city"],
-                            thumbnail=pick["away_team_thumbnail"],
-                            primary_color=pick["home_team_primary_color"],
-                            secondary_color=pick["home_team_secondary_color"],
-                        ),
-                        result=GameResultDto(
-                            home_team_id=pick["home_team_id"],
-                            home_team_name=pick["home_team_name"],
-                            home_team_city=pick["home_team_city"],
-                            home_team_score=pick["home_team_score"],
-                            away_team_id=pick["away_team_id"],
-                            away_team_name=pick["away_team_name"],
-                            away_team_city=pick["away_team_city"],
-                            away_team_score=pick["away_team_score"],
-                        ),
-                    ),
                     score=score,
-                    is_correct=is_correct,
+                    pick_status=pick_status,
                 )
             )
             user_results[pick["username"]]["total_score"] += score
@@ -196,16 +193,9 @@ class ResultsService(BaseService):
     async def get_pick_history_for_year(
         self, year: int, week: int, user: str = None
     ) -> list[UserPickResultsDto]:
-        # # Create tasks for each week's results in parallel
-        # tasks = [self._get_week_results_task(year, w, user) for w in range(1, week + 1)]
-        #
-        # # Run all tasks concurrently
-        # week_results_1: tuple[WeekResultsDto] = await asyncio.gather(*tasks)
-
-        week_results_2 = await self._get_pick_results(
-            year, _week_model.week_number <= week, user
+        return await self._get_pick_results(
+            year=year, week_condition=_week_model.week_number <= week, user=user
         )
-        return list(week_results_2)
 
     async def _get_week_results_task(self, year: int, week: int, user: str):
         week_condition = _week_model.week_number == week
@@ -216,14 +206,6 @@ class ResultsService(BaseService):
         self, user_results: list[UserPickResultsDto]
     ) -> list[UserPickResultsDto]:
         return user_results
-        # return [
-        #     LeaguePickResultsDto(
-        #         username=result.username,
-        #         total_score=result.total_score,
-        #         rank=result.rank,
-        #     )
-        #     for result in user_results
-        # ]
 
     async def get_nfl_game_results(
         self, year: int, week: int, page: int, page_size: int

@@ -145,17 +145,18 @@ class EspnScraper(BaseScraper):
             self.logger.info(f"created season {year}")
 
         for week, games in season.items():
-            for (
-                home_city,
-                home_team,
-                # home_score,
-                away_city,
-                away_team,
-                # away_score,
-                results,
-                start_date,
-                start_time,
-            ) in games:
+            for game in games:
+                self.logger.info(f"saving game {game}")
+                (
+                    home_city,
+                    home_team,
+                    away_city,
+                    away_team,
+                    results,
+                    start_date,
+                    start_time,
+                ) = game
+
                 # load season model
                 week_model, created = WeekModel.get_or_create(
                     season=season_model,
@@ -192,14 +193,15 @@ class EspnScraper(BaseScraper):
                             result.away_score = results[away_team_model.abbreviation]
                             result.save()
                         except KeyError as e:
-                            print(e)
+                            self.logger.exception(f"failed to parse scores {e}")
                             raise e
                     else:
-                        GameResultModel.create(
+                        model = GameResultModel.create(
                             game=game,
                             home_score=results[home_team_model.abbreviation],
                             away_score=results[away_team_model.abbreviation],
                         )
+                        self.logger.info(f"created game results entry {model}")
 
                 if created:
                     self.logger.info(f"created game {home_city} vs {away_city}")

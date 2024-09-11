@@ -1,7 +1,7 @@
 from datetime import time, date
 
 from pydantic import Field, field_validator, ValidationError
-from typing import List
+from typing import List, Literal
 
 from src.models.base_models import BaseDto
 
@@ -77,15 +77,15 @@ class PickDto(BaseDto):
     confidence: int
     spread_value: float = Field(alias="line")
     status: str
-    game: MatchupDto = Field(alias="game")
-    score: int | None = Field(default=None)
-    is_correct: bool | None = Field(alias="isCorrect", default=None)
+    game: MatchupDto | None = Field(alias="game", default=None)
+    score: float = Field(default=0.0)
+    pick_status: Literal["COVERED", "FAILED", "PUSHED"] | None = Field(default=None)
 
 
 class UserPickResultsDto(BaseDto):
     username: str
     picks: List[PickDto]
-    total_score: int = Field(alias="totalScore")
+    total_score: float = Field(default=0.0)
     rank: int | None = Field(default=None)
 
 
