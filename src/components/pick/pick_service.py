@@ -13,6 +13,7 @@ from src.models.new_db_models import (
     UserModel,
     WeekModel,
     SeasonModel,
+    GameResultModel,
 )
 from peewee import DoesNotExist
 from src.components.pick.pick_exceptions import (
@@ -215,9 +216,16 @@ class PickService(BaseService):
             (PickModel.user == user.id) & (PickModel.game << games)
         )
 
+        filtered_games = [pick.game for pick in picks]
+        results = GameResultModel.select().where(
+            (GameResultModel.game << filtered_games)
+        )
+        results_lookup = {result["game"]: result for result in results.dicts()}
+
         pick_dto_list = []
         for pick in picks:
             game = pick.game
+            game_results = results_lookup.get(game.id, {})
 
             # Manually map fields to MatchupDto
             matchup_dto = MatchupDto(
@@ -245,6 +253,14 @@ class PickService(BaseService):
                         "."
                     ),
                 },
+                results=(
+                    {
+                        game.home_team.name: game_results.get("home_score"),
+                        game.away_team.name: game_results.get("away_score"),
+                    }
+                    if game_results
+                    else None
+                ),
             )
 
             # Construct the PickDto

@@ -171,7 +171,7 @@ class SpreadService(BaseService):
                                 SpreadModel.spread_value,
                             )
                         ],
-                        0,
+                        None,
                     )
                 ).alias("home_spread_value"),
                 fn.SUM(
@@ -183,7 +183,7 @@ class SpreadService(BaseService):
                                 SpreadModel.spread_value,
                             )
                         ],
-                        0,
+                        None,
                     )
                 ).alias("away_spread_value"),
             )
@@ -211,7 +211,8 @@ class SpreadService(BaseService):
             .where(
                 WeekModel.week_number == week,
                 SeasonModel.year == year,
-                SpreadModel.bookmaker == bookmaker,
+                (SpreadModel.bookmaker == bookmaker)
+                | (SpreadModel.bookmaker.is_null(True)),
             )
             .group_by(
                 GameModel.id,
@@ -303,14 +304,23 @@ class SpreadService(BaseService):
                             "away_team_name"
                         ]: f"{game.get('away_team_home_wins', 0)}-{game.get('away_team_home_losses', 0)}"
                     },
-                    lines={
-                        game[
-                            "home_team_name"
-                        ]: f"{game['home_spread_value']:.1f}".rstrip("0").rstrip("."),
-                        game[
-                            "away_team_name"
-                        ]: f"{game['away_spread_value']:.1f}".rstrip("0").rstrip("."),
-                    },
+                    lines=(
+                        {
+                            game[
+                                "home_team_name"
+                            ]: f"{game['home_spread_value']:.1f}".rstrip("0").rstrip(
+                                "."
+                            ),
+                            game[
+                                "away_team_name"
+                            ]: f"{game['away_spread_value']:.1f}".rstrip("0").rstrip(
+                                "."
+                            ),
+                        }
+                        if game["home_spread_value"] is not None
+                        and game["away_spread_value"] is not None
+                        else None
+                    ),
                     start_date=game["start_date"],
                     start_time=game["start_time"],
                 )
@@ -320,8 +330,8 @@ class SpreadService(BaseService):
             print(e)
 
 
-if __name__ == "__main__":
-    service = SpreadService()
-    w = 1
-    week: WeekModel = WeekModel.get(week_number=w)
-    service.load_spreads(start_date=week.start_date, end_date=week.end_date)
+# if __name__ == "__main__":
+#     service = SpreadService()
+#     w = 1
+#     week: WeekModel = WeekModel.get(week_number=w)
+#     service.load_spreads(start_date=week.start_date, end_date=week.end_date)

@@ -6,11 +6,6 @@ on:
       - main
       - feature/*
 
-#  pull_request:
-#    branches:
-#      - main
-#      - feature/*
-
 env:
   AWS_BUCKET: "pickem-api"
   AWS_LAMBDA: "pickem-api"
@@ -36,6 +31,12 @@ jobs:
         with:
           version: latest
 
+      - name: 'Configure AWS credentials'
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::881413588329:role/Pickem_Deployer
+          aws-region: us-east-1
+
       - name: 'Extract Version'
         id: extract_version
         run: |
@@ -46,7 +47,7 @@ jobs:
         id: check_release_exists
         run: |
           release_file="${{ env.project_version }}-release.zip"
-          if aws s3 ls s3://${{ env.AWS_BUCKET }}/$release_file; then
+          if aws s3 ls s3://${{ env.AWS_BUCKET }}/${release_file}; then
             echo "Error: Release ${release_file} already exists. Please bump the version before proceeding."
             exit 1
           else
@@ -56,14 +57,7 @@ jobs:
       - name: 'Determine Artifact Name and Tag'
         id: determine_artifact_name
         run: |
-          # Check if this is a pull request event
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            # Use the head ref for pull request
-            branch_name="${{ github.event.pull_request.head.ref }}"
-          else
-            # Use the normal ref for branch pushes
-            branch_name=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
-          fi
+          branch_name=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
 
           # Determine artifact name based on the branch
           if [[ "${branch_name}" == feature/* ]]; then
@@ -103,12 +97,6 @@ jobs:
           poetry run pip install --upgrade --target package dist/*.whl
           cd package && zip -r ../${{ env.artifact_name }} . -x '*.pyc'
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          role-to-assume: arn:aws:iam::881413588329:role/Pickem_Deployer
-          aws-region: us-east-1
-
       - name: 'Upload to S3'
         run: aws s3 cp ${{ env.artifact_name }} s3://${{ env.AWS_BUCKET }}/
 
@@ -136,6 +124,21 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::881413588329:role/Pickem_Deployer
           aws-region: us-east-1
+
+      - name: 'Set Lambda Function Name'
+        id: set_lambda_name
+        run: |
+          branch_name=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
+
+          # Set lambda function name based on branch
+          if [[ "${branch_name}" == feature/* ]]; then
+            echo "AWS_LAMBDA=${{ env.AWS_LAMBDA }}_dev" >> $GITHUB_ENV
+          elif [[ "${branch_name}" == main ]]; then
+            echo "AWS_LAMBDA=${{ env.AWS_LAMBDA }}_prod" >> $GITHUB_ENV
+          else
+            echo "Invalid branch name"
+            exit 1
+          fi
 
       - name: 'Update Lambda Function with S3 Object Name'
         run: |

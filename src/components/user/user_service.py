@@ -43,12 +43,17 @@ class UserService(BaseService):
         """
         self.logger.info(f"Fetching user by username: {username}")
         try:
+            # q = UserModel.select().where(UserModel.username == username)
+            # self.logger.info(f"q = {q}")
+            # user = q.execute()
             user = UserModel.get(username=username)
             self.logger.info(f"User '{username}' found.")
             return user
         except DoesNotExist:
             self.logger.error(f"Failed to find user: {username}")
             return None
+        except Exception as e:
+            raise e
 
     def validate_user_from_decoded_token(
         self, decoded_token: DecodedToken

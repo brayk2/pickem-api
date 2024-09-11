@@ -1,35 +1,14 @@
 from datetime import datetime, timedelta
 from typing import List
-
-import boto3
 import pytz
-from botocore.exceptions import ClientError
 from jose import JWTError, jwt
 from src.components.auth.auth_models import DecodedToken, TokenResponse
 from src.components.auth.auth_exceptions import InvalidTokenException
 from src.config.base_service import BaseService
 from src.config.settings import Settings
 from src.services.password_manager import PasswordManager
-from src.util.injection import dependency
-import os
-
-settings = Settings()
-
-
-def get_secret():
-    # Create a Secrets Manager client
-    client = boto3.client(service_name="secretsmanager")
-    try:
-        get_secret_value_response = client.get_secret_value(
-            SecretId=settings.secret_path
-        )
-    except ClientError as e:
-        # For a list of exceptions thrown, see
-        # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
-        raise e
-
-    secret = get_secret_value_response["SecretString"]
-    return secret
+from src.services.secret_service import SecretService
+from src.util.injection import dependency, inject
 
 
 @dependency
@@ -39,8 +18,11 @@ class OAuthService(BaseService):
     password hashing, and token decoding.
     """
 
+    @inject
     def __init__(
         self,
+        secret_service: SecretService,
+        settings: Settings,
         algorithm: str = "HS256",
         access_token_expire_minutes: int = 15,  # Short-lived access tokens
         refresh_token_expire_days: int = 7,  # Long-lived refresh tokens
@@ -52,10 +34,11 @@ class OAuthService(BaseService):
         :param access_token_expire_minutes: The expiration time for access tokens.
         :param refresh_token_expire_days: The expiration time for refresh tokens.
         """
-        self.secret_key = get_secret()
         self.algorithm = algorithm
         self.access_token_expire_minutes = access_token_expire_minutes
         self.refresh_token_expire_days = refresh_token_expire_days
+        self.secret_service = secret_service
+        self.settings = settings
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """
@@ -110,7 +93,11 @@ class OAuthService(BaseService):
         to_encode.update({"exp": expire.timestamp() * 1000})
 
         return (
-            jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm),
+            jwt.encode(
+                to_encode,
+                self.secret_service.get_secret(secret_path=self.settings.secret_path),
+                algorithm=self.algorithm,
+            ),
             to_encode,
         )
 
@@ -124,7 +111,9 @@ class OAuthService(BaseService):
         """
         try:
             payload_dict = jwt.decode(
-                token, self.secret_key, algorithms=[self.algorithm]
+                token,
+                self.secret_service.get_secret(secret_path=self.settings.secret_path),
+                algorithms=[self.algorithm],
             )
             return DecodedToken.from_dict(payload_dict)
         except JWTError:

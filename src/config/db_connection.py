@@ -1,34 +1,25 @@
 from peewee import PostgresqlDatabase
 from playhouse.pool import PooledPostgresqlDatabase
-
 from src.config.logger import Logger
 from src.config.settings import Settings
-
-
-def get_database() -> PostgresqlDatabase:
-    settings = Settings()
-    return PooledPostgresqlDatabase(
-        settings.db_name,
-        host=settings.db_host,
-        user=settings.db_user,
-        password=settings.db_pass,
-        max_connections=20,  # Maximum number of connections in the pool
-        stale_timeout=300,
-        sslmode="require",
-    )
-
+from src.services.secret_service import SecretService
 
 logger = Logger()
 
 
-def get_new_database() -> PostgresqlDatabase:
+def get_database() -> PostgresqlDatabase:
     settings = Settings()
+    secret_service = SecretService()
+
+    logger.info(f"db name = {settings.db_name}")
+    secret = secret_service.get_secret("dev/db")
+
     return PooledPostgresqlDatabase(
         settings.db_name,
         thread_safe=True,
         host=settings.db_host,
-        user=settings.db_user,
-        password=settings.db_pass,
+        user=secret.get("username"),
+        password=secret.get("password"),
         max_connections=20,
         stale_timeout=900,
         sslmode="require",

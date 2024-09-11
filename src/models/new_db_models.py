@@ -15,9 +15,9 @@ from peewee import (
 from playhouse.postgres_ext import JSONField
 from playhouse.shortcuts import model_to_dict
 
-from src.config.db_connection import get_new_database
+from src.config.db_connection import get_database
 
-database = get_new_database()
+database = get_database()
 
 
 class BaseModel(Model):
@@ -115,6 +115,7 @@ class WeekModel(BaseModel):
 class TeamModel(BaseModel):
     name = CharField()
     city = CharField()
+    abbreviation = CharField()
     thumbnail = CharField(null=True)
     primary_color = CharField(null=True, max_length=7)
     secondary_color = CharField(null=True, max_length=7)
