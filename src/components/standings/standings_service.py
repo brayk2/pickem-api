@@ -23,8 +23,13 @@ class StandingsService(BaseService):
         self.logger = logger
 
     @staticmethod
-    async def _calc_correct_picks(picks: list[PickDto]) -> int:
-        return sum(1 for pick in picks if pick.is_correct)
+    async def _calc_correct_picks(picks: list[PickDto]) -> float:
+        status_scores = {
+            "COVERED": 1,
+            "PUSHED": 0.5,
+            "FAILED": 0,
+        }
+        return sum(status_scores.get(pick.pick_status, 0) for pick in picks)
 
     @staticmethod
     async def _calc_total_picks(picks: list[PickDto]) -> int:
@@ -38,9 +43,9 @@ class StandingsService(BaseService):
         # Fetch user pick results up to the specified year and week
         self.logger.info(f"Fetching standings for year {year} up to week {week}")
 
-        pick_results: list[
-            UserPickResultsDto
-        ] = await self.results_service.get_pick_history_for_year(year=year, week=week)
+        pick_results: list[UserPickResultsDto] = (
+            await self.results_service.get_pick_history_for_year(year=year, week=week)
+        )
 
         user_aggregated_results = {}
 

@@ -4,9 +4,9 @@ from pydantic import BaseModel
 class StandingsDto(BaseModel):
     username: str
     rank: int
-    correct_picks: int  # Number of correct picks
+    correct_picks: float  # Number of correct picks
     total_picks: int  # Total number of picks
-    score: int  # Total score
+    score: float  # Total score
 
 
 class UserHistoryDto(BaseModel):
