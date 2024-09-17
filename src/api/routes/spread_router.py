@@ -18,5 +18,6 @@ async def get_spreads_for_week(
     week: int,
     bookmaker: str,
 ):
-    x = await spread_service.get_matchup_data(year=year, week=week, bookmaker=bookmaker)
-    return x
+    return await spread_service.get_matchup_data(
+        year=year, week=week, bookmaker=bookmaker
+    )
