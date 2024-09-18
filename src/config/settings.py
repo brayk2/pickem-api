@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.util.injection import dependency
 
-env = os.getenv("ENVIRONMENT", "dev")
+env = os.getenv("ENVIRONMENT", "local")
 
 
 def get_resources_path() -> str:
