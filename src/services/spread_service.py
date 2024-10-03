@@ -335,15 +335,6 @@ class SpreadService(BaseService):
         except Exception as e:
             print(e)
 
-    def get_spreads_for_week(self, w: int, book: str = "DraftKings"):
-        spreads = (
-            SpreadModel.select()
-            .join(GameModel)
-            .join(WeekModel)
-            .where(SpreadModel.bookmaker == book, WeekModel.week_number == w)
-        )
-        return spreads
-
 
 # if __name__ == "__main__":
 #     service = SpreadService()
