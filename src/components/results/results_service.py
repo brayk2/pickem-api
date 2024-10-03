@@ -1,5 +1,7 @@
 import asyncio
 
+from peewee import JOIN
+
 from src.components.results.results_dto import (
     UserPickResultsDto,
     WeekResultsDto,
@@ -43,7 +45,7 @@ class ResultsService(BaseService):
         self, year: int, week_condition, user: str = None
     ) -> list[UserPickResultsDto]:
         """
-        get list of all picks filtered by user and week
+        Get list of all picks filtered by user and week.
 
         :param year:
         :param week_condition:
@@ -51,9 +53,9 @@ class ResultsService(BaseService):
         :return:
         """
         query = (
-            _pick.select(
-                _pick.id,
+            _user.select(
                 _user.username,
+                _pick.id.alias("pick_id"),
                 _pick.game.alias("game_id"),
                 _pick.spread_value,
                 _pick.confidence,
@@ -79,14 +81,14 @@ class ResultsService(BaseService):
                 _game_result.home_score.alias("home_team_score"),
                 _game_result.away_score.alias("away_team_score"),
             )
-            .join(_user, on=(_pick.user == _user.id))
-            .join(_game, on=(_pick.game == _game.id))
-            .join(_team, on=(_pick.team == _team.id))
-            .join(_home_team, on=(_game.home_team == _home_team.id))
-            .join(_away_team, on=(_game.away_team == _away_team.id))
-            .join(_game_result, on=(_game_result.game == _game.id))
-            .join(_season, on=(_game.season == _season.id))
-            .join(_week_model, on=(_game.week == _week_model.id))
+            .join(_pick, JOIN.LEFT_OUTER, on=(_pick.user == _user.id))
+            .join(_game, JOIN.LEFT_OUTER, on=(_pick.game == _game.id))
+            .join(_team, JOIN.LEFT_OUTER, on=(_pick.team == _team.id))
+            .join(_home_team, JOIN.LEFT_OUTER, on=(_game.home_team == _home_team.id))
+            .join(_away_team, JOIN.LEFT_OUTER, on=(_game.away_team == _away_team.id))
+            .join(_game_result, JOIN.LEFT_OUTER, on=(_game_result.game == _game.id))
+            .join(_season, JOIN.LEFT_OUTER, on=(_game.season == _season.id))
+            .join(_week_model, JOIN.LEFT_OUTER, on=(_game.week == _week_model.id))
             .where(
                 _season.year == year,
                 week_condition,
@@ -97,81 +99,89 @@ class ResultsService(BaseService):
             query = query.where(_user.username == user)
 
         self.logger.info(f"Query generated: {query.sql()}")
-        picks = query.dicts()
-        self.logger.info(f"Number of picks returned: {len(list(picks))}")
+        picks = list(query.dicts())
+        self.logger.info(f"Number of picks returned: {len(picks)}")
 
         user_results = {}
+
+        # Initialize user_results with all users
+        all_usernames = [user.username for user in _user.select(_user.username)]
+        for username in all_usernames:
+            user_results[username] = {
+                "username": username,
+                "picks": [],
+                "total_score": 0,
+                "rank": 0,
+            }
+
         for pick in picks:
-            self.logger.debug(f"Processing pick: {pick}")
-            pick_status = ""
+            username = pick["username"]
 
-            try:
-                if (
-                    pick["selected_team_id"] == pick["home_team_id"]
-                    and (pick["home_team_score"] + pick["spread_value"])
-                    > pick["away_team_score"]
-                ) or (
-                    pick["selected_team_id"] == pick["away_team_id"]
-                    and (pick["away_team_score"] + pick["spread_value"])
-                    > pick["home_team_score"]
-                ):
-                    pick_status = "COVERED"
-                elif (
-                    pick["selected_team_id"] == pick["home_team_id"]
-                    and (pick["home_team_score"] + pick["spread_value"])
-                    < pick["away_team_score"]
-                ) or (
-                    pick["selected_team_id"] == pick["away_team_id"]
-                    and (pick["away_team_score"] + pick["spread_value"])
-                    < pick["home_team_score"]
-                ):
-                    pick_status = "FAILED"
-                elif (
-                    pick["selected_team_id"] == pick["home_team_id"]
-                    and (pick["home_team_score"] + pick["spread_value"])
-                    == pick["away_team_score"]
-                ) or (
-                    pick["selected_team_id"] == pick["away_team_id"]
-                    and (pick["away_team_score"] + pick["spread_value"])
-                    == pick["home_team_score"]
-                ):
-                    pick_status = "PUSHED"
-            except Exception as e:
-                self.logger.exception(e)
-                raise e
+            if pick["pick_id"] is not None:
+                self.logger.debug(f"Processing pick: {pick}")
+                pick_status = ""
 
-            multiplier = (
-                1 if pick_status == "COVERED" else 0.5 if pick_status == "PUSHED" else 0
-            )
-            score = pick.get("confidence", 0) * multiplier
+                try:
+                    if (
+                        pick["selected_team_id"] == pick["home_team_id"]
+                        and (pick["home_team_score"] + pick["spread_value"])
+                        > pick["away_team_score"]
+                    ) or (
+                        pick["selected_team_id"] == pick["away_team_id"]
+                        and (pick["away_team_score"] + pick["spread_value"])
+                        > pick["home_team_score"]
+                    ):
+                        pick_status = "COVERED"
+                    elif (
+                        pick["selected_team_id"] == pick["home_team_id"]
+                        and (pick["home_team_score"] + pick["spread_value"])
+                        < pick["away_team_score"]
+                    ) or (
+                        pick["selected_team_id"] == pick["away_team_id"]
+                        and (pick["away_team_score"] + pick["spread_value"])
+                        < pick["home_team_score"]
+                    ):
+                        pick_status = "FAILED"
+                    elif (
+                        pick["selected_team_id"] == pick["home_team_id"]
+                        and (pick["home_team_score"] + pick["spread_value"])
+                        == pick["away_team_score"]
+                    ) or (
+                        pick["selected_team_id"] == pick["away_team_id"]
+                        and (pick["away_team_score"] + pick["spread_value"])
+                        == pick["home_team_score"]
+                    ):
+                        pick_status = "PUSHED"
+                except Exception as e:
+                    self.logger.exception(e)
+                    pick_status = "UNKNOWN"
 
-            if pick["username"] not in user_results:
-                user_results[pick["username"]] = {
-                    "username": pick["username"],
-                    "picks": [],
-                    "total_score": 0,
-                    "rank": 0,  # To be calculated later
-                }
-
-            user_results[pick["username"]]["picks"].append(
-                PickDto(
-                    id=pick["id"],
-                    team=TeamDto(
-                        team_id=pick["selected_team_id"],
-                        team_name=pick["selected_team_name"],
-                        team_city=pick["selected_team_city"],
-                        thumbnail=pick["selected_team_thumbnail"],
-                        primary_color=pick["selected_team_primary_color"],
-                        secondary_color=pick["selected_team_secondary_color"],
-                    ),
-                    confidence=pick["confidence"],
-                    spread_value=pick["spread_value"],
-                    status=pick["status"],
-                    score=score,
-                    pick_status=pick_status,
+                multiplier = (
+                    1
+                    if pick_status == "COVERED"
+                    else 0.5 if pick_status == "PUSHED" else 0
                 )
-            )
-            user_results[pick["username"]]["total_score"] += score
+                score = pick.get("confidence", 0) * multiplier
+
+                user_results[username]["picks"].append(
+                    PickDto(
+                        id=pick["pick_id"],
+                        team=TeamDto(
+                            team_id=pick["selected_team_id"],
+                            team_name=pick["selected_team_name"],
+                            team_city=pick["selected_team_city"],
+                            thumbnail=pick["selected_team_thumbnail"],
+                            primary_color=pick["selected_team_primary_color"],
+                            secondary_color=pick["selected_team_secondary_color"],
+                        ),
+                        confidence=pick["confidence"],
+                        spread_value=pick["spread_value"],
+                        status=pick["status"],
+                        score=score,
+                        pick_status=pick_status,
+                    )
+                )
+                user_results[username]["total_score"] += score
 
         self.logger.info(f"Processed results for users: {list(user_results.keys())}")
         sorted_results = sorted(
