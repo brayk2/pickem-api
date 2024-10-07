@@ -90,6 +90,8 @@ class ResultsService(BaseService):
             .where(
                 _season.year == year,
                 week_condition,
+                _game_result.home_score.is_null(False),  # Ensure the game has concluded
+                _game_result.away_score.is_null(False),  # Ensure the game has concluded
             )
         )
 
