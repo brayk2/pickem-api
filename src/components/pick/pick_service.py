@@ -118,6 +118,10 @@ class PickService(BaseService):
         :raises LockedPickException: If a user attempts to remove a locked pick.
         :raises InvalidGameWeekException: If any pick's game does not belong to the specified year and week.
         """
+        self.logger.info(
+            f"attempting to submit picks {pick_data} for user {user.username}"
+        )
+
         # Validate picks
         self.validate_picks(pick_data)
 
