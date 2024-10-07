@@ -79,7 +79,9 @@ class PickDto(BaseDto):
     status: str
     game: MatchupDto | None = Field(alias="game", default=None)
     score: float = Field(default=0.0)
-    pick_status: Literal["COVERED", "FAILED", "PUSHED"] | None = Field(default=None)
+    pick_status: Literal["COVERED", "FAILED", "PUSHED", "UNKNOWN"] | None = Field(
+        default=None
+    )
 
 
 class UserPickResultsDto(BaseDto):
