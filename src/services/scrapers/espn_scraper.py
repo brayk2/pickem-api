@@ -41,11 +41,14 @@ class EspnScraper(BaseScraper):
 
         games_info = []
         for game_day in game_days:
-            # date = None
+            date = None
             if date_elm := game_day.select_one("div.Table__Title"):
                 date_str = date_elm.text.strip()
-                date = datetime.strptime(date_str, "%A, %B %d, %Y")
-                date = date.astimezone(pytz.utc)
+                try:
+                    date = datetime.strptime(date_str, "%A, %B %d, %Y")
+                    date = date.astimezone(pytz.utc)
+                except Exception as e:
+                    self.logger.warning(f"Failed to parse date {date_str} : {e}")
 
             games = game_day.select("tbody.Table__TBODY tr.Table__TR")
             for game in games:
