@@ -8,7 +8,10 @@ logger = Logger()
 
 @connect_db
 def handle_event(event, context):
-    logger.info("initializing lambda to load games and results")
+    logger.info(
+        f"Initializing lambda to load games and results with event={event} and context={context}"
+    )
+
     scraper = EspnScraper()
     season_service = SeasonService()
 
