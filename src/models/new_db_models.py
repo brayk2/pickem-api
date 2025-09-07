@@ -211,3 +211,12 @@ class PickModel(BaseModel):
                 True,
             ),  # Ensure a user cannot submit more than one pick per game
         )
+
+
+class ActionModel(BaseModel):
+    name = CharField()
+    type = CharField()
+    arn = CharField
+
+    class Meta:
+        table_name = "action"

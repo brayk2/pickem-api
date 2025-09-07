@@ -155,5 +155,4 @@ class OddsApiService(BaseService):
 
 
 if __name__ == "__main__":
-    scores = OddsApiService().fetch_scores()
-    print(scores)
+    pass

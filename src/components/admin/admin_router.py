@@ -8,6 +8,7 @@ from src.components.admin.admin_service import AdminService
 from src.components.auth.auth_models import DecodedToken
 from src.components.auth.permission_checker import PermissionChecker
 from src.config.logger import Logger
+from src.models.dto.action_dto import CreateActionRequest
 from src.models.dto.admin_dtos import ApiQuota
 from src.models.dto.group_dto import CreateGroupRequest, CreateGroupResponse
 from src.models.new_db_models import GameModel, SpreadModel, GroupModel
@@ -36,3 +37,23 @@ async def get_quota(
     except Exception as e:
         # logger.error(f"Error fetching API quota: {e}")
         raise PropertyNotFoundException("Error fetching API quota", category="api")
+
+
+@admin_router.get("/weeks")
+async def get_week_information(
+    season: int, admin_service: AdminService = Depends(AdminService.create)
+):
+    return admin_service.get_week_information(season=season)
+
+
+@admin_router.get("/actions")
+async def get_actions(admin_service: AdminService = Depends(AdminService.create)):
+    return admin_service.get_actions()
+
+
+@admin_router.post("/action")
+async def create_action(
+    create_action_request: CreateActionRequest,
+    admin_service: AdminService = Depends(AdminService.create),
+):
+    return admin_service.create_action(create_action_request=create_action_request)
