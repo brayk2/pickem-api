@@ -1,7 +1,11 @@
+import boto3
+
 from src.config.base_service import BaseService
+from src.models.dto.action_dto import CreateActionRequest, ActionType
+from src.models.dto.week_dto import WeekDto
 from src.util.injection import dependency, inject
 from src.services.property_service import PropertyService
-from src.models.new_db_models import PropertyModel
+from src.models.new_db_models import PropertyModel, WeekModel, SeasonModel
 
 
 @dependency
@@ -42,3 +46,31 @@ class AdminService(BaseService):
         )
         self.logger.info(f"Odds API quota set successfully: {prop.value}")
         return prop
+
+    def get_week_information(self, season: int) -> list[WeekDto]:
+        return [
+            WeekDto.from_orm(week)
+            for week in WeekModel.select().where(WeekModel.season == season)
+        ]
+
+    def get_actions(self):
+        actions = []
+
+        client = boto3.client("lambda")
+        paginator = client.get_paginator("list_functions")
+
+        for page in paginator.paginate():
+            actions.extend(page.get("Functions", []))
+            # for lbda in page.get("Functions"):
+            # actions.append(
+            #     {
+            #         "function_name": lbda.get("FunctionName"),
+            #         "function_arn": lbda.get("FunctionArn"),
+            #     }
+            # )
+
+        return actions
+
+    def create_action(self, create_action_request: CreateActionRequest):
+        client = boto3.client("lambda")
+        client.get_function(FunctionName=create_action_request.arn)

@@ -248,3 +248,7 @@ class UserService(BaseService):
 
         self.roles_service.manage_user_roles(username=username, role_name=role_name)
         self.logger.info(f"User '{username}' added to role '{role_name}' successfully.")
+
+    def list_users(self) -> list[UserDto]:
+        self.logger.info("listing users in db")
+        return [UserDto.from_orm(user) for user in UserModel.select()]
