@@ -35,7 +35,7 @@ class UserDto(BaseDto):
     first_name: str | None = Field(default=None)
     last_name: str | None = Field(default=None)
     email: EmailStr
-    groups: list[str] | None = Field(exclude=True, default_factory=list)
+    groups: list[str] | None = Field(exclude=False, default_factory=list)
 
     @computed_field
     @property
