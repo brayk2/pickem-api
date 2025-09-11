@@ -18,6 +18,7 @@ from src.components.roles.roles_router import roles_router
 from src.components.standings.standings_router import standings_router
 from src.components.user.user_router import user_router
 from src.components.season.season_router import season_router
+from src.components.user.users_router import users_router
 from src.config.logger import Logger
 from src.models.new_db_models import database
 
@@ -68,6 +69,7 @@ async def exception_handling_middleware(request: Request, call_next):
 app.include_router(auth_router)
 app.include_router(season_router)
 app.include_router(user_router)
+app.include_router(users_router)
 app.include_router(roles_router)
 app.include_router(results_router)
 app.include_router(standings_router)

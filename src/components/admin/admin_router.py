@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from playhouse.shortcuts import model_to_dict
 
 from src.components.admin.admin_exception import (
     PropertyNotFoundException,
 )
-from src.components.admin.admin_service import AdminService
+from src.components.admin.admin_service import AdminService, PaginationOptions
 from src.components.auth.auth_models import DecodedToken
 from src.components.auth.permission_checker import PermissionChecker
 from src.config.logger import Logger
@@ -49,6 +49,35 @@ async def get_week_information(
 @admin_router.get("/actions")
 async def get_actions(admin_service: AdminService = Depends(AdminService.create)):
     return admin_service.get_actions()
+
+
+@admin_router.get("/executions/{state_machine_arn}")
+async def get_executions(
+    state_machine_arn: str, admin_service: AdminService = Depends(AdminService.create)
+):
+    return admin_service.get_executions(state_machine_arn=state_machine_arn)
+
+
+@admin_router.get("/executions/{state_machine_arn}/{execution_arn}")
+async def get_execution(
+    state_machine_arn: str,
+    execution_arn: str,
+    max_results: int = Query(default=10),
+    next_token: str = Query(default=None),
+    admin_service: AdminService = Depends(AdminService.create),
+):
+    return admin_service.get_execution(
+        state_machine_arn=state_machine_arn,
+        execution_arn=execution_arn,
+        pagination_options=PaginationOptions(
+            max_results=max_results, next_token=next_token
+        ),
+    )
+
+
+@admin_router.get("/schedulers")
+async def get_schedulers(admin_service: AdminService = Depends(AdminService.create)):
+    return admin_service.get_schedulers()
 
 
 @admin_router.post("/action")

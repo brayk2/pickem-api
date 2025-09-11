@@ -71,6 +71,15 @@ class UserModel(BaseModel):
     last_name: str = CharField()
     password_hash = CharField()
 
+    @property
+    def groups(self) -> list[str]:
+        return [
+            group.name
+            for group in GroupModel.select()
+            .join(UserGroupModel)
+            .where(UserGroupModel.user == self)
+        ]
+
     class Meta:
         table_name = "user"
 

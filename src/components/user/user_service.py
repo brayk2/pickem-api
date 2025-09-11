@@ -251,4 +251,7 @@ class UserService(BaseService):
 
     def list_users(self) -> list[UserDto]:
         self.logger.info("listing users in db")
-        return [UserDto.from_orm(user) for user in UserModel.select()]
+        return [
+            UserDto.from_orm(user)
+            for user in UserModel.select().order_by(UserModel.username)
+        ]

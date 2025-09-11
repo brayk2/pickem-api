@@ -1,4 +1,6 @@
 import boto3
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 from src.config.base_service import BaseService
 from src.models.dto.action_dto import CreateActionRequest, ActionType
@@ -6,6 +8,13 @@ from src.models.dto.week_dto import WeekDto
 from src.util.injection import dependency, inject
 from src.services.property_service import PropertyService
 from src.models.new_db_models import PropertyModel, WeekModel, SeasonModel
+
+
+class PaginationOptions(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    max_results: int = Field(default=10)
+    next_token: str | None = Field(default=None)
 
 
 @dependency
@@ -56,20 +65,60 @@ class AdminService(BaseService):
     def get_actions(self):
         actions = []
 
-        client = boto3.client("lambda")
-        paginator = client.get_paginator("list_functions")
+        client = boto3.client("stepfunctions")
+        paginator = client.get_paginator("list_state_machines")
 
         for page in paginator.paginate():
-            actions.extend(page.get("Functions", []))
-            # for lbda in page.get("Functions"):
-            # actions.append(
-            #     {
-            #         "function_name": lbda.get("FunctionName"),
-            #         "function_arn": lbda.get("FunctionArn"),
-            #     }
-            # )
+            for state_machine in page.get("stateMachines", []):
+                tags_response = client.list_tags_for_resource(
+                    resourceArn=state_machine.get("stateMachineArn")
+                )
+                actions.append({**state_machine, "tags": tags_response.get("tags")})
 
         return actions
+
+    def get_executions(self, state_machine_arn: str):
+        executions = []
+
+        client = boto3.client("stepfunctions")
+        paginator = client.get_paginator("list_executions")
+
+        for page in paginator.paginate(stateMachineArn=state_machine_arn):
+            executions.extend(page.get("executions", []))
+
+        return executions
+
+    def get_execution(
+        self,
+        state_machine_arn: str,
+        execution_arn: str,
+        pagination_options: PaginationOptions,
+    ):
+        self.logger.info(
+            f"looking up execution state_machine={state_machine_arn}, execution={execution_arn}"
+        )
+
+        client = boto3.client("stepfunctions")
+        response = client.get_execution_history(
+            executionArn=execution_arn,
+            **pagination_options.model_dump(by_alias=True, exclude_none=True),
+        )
+
+        return {
+            "events": response.get("events", []),
+            "nextToken": response.get("nextToken"),
+        }
+
+    def get_schedulers(self):
+        schedules = []
+
+        client = boto3.client("scheduler")
+        paginator = client.get_paginator("list_schedules")
+
+        for page in paginator.paginate():
+            schedules.extend(page.get("Schedules", []))
+
+        return schedules
 
     def create_action(self, create_action_request: CreateActionRequest):
         client = boto3.client("lambda")

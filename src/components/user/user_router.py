@@ -12,7 +12,9 @@ from src.components.user.user_models import (
 from src.components.user.user_service import UserService
 from src.services.oauth_service import OAuthService
 
-user_router = APIRouter(prefix="/users", tags=["Users"])
+user_router = APIRouter(
+    prefix="/user", tags=["User"], dependencies=[Depends(PermissionChecker.player)]
+)
 
 
 @user_router.post("", status_code=status.HTTP_201_CREATED, response_model=UserDto)
