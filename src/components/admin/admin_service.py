@@ -88,25 +88,49 @@ class AdminService(BaseService):
 
         return executions
 
+    def _group_execution_history_events(self, events: list[dict]) -> dict:
+        tasks = {}
+        current_task = None
+
+        for event in events:
+            event_type = event.get("type")
+
+            # skip execution events
+            if event_type.startswith("Execution"):
+                continue
+
+            # begin new task if it is starting
+            if "stateEnteredEventDetails" in event:
+                current_task = event["stateEnteredEventDetails"]["name"]
+
+            # add the event to the list for current task
+            tasks[current_task] = [*tasks.get(current_task, []), event]
+
+            if "stateExitedEventDetails" in event:
+                current_task = None
+
+        return tasks
+
     def get_execution(
         self,
         state_machine_arn: str,
         execution_arn: str,
         pagination_options: PaginationOptions,
     ):
+        events = []
         self.logger.info(
             f"looking up execution state_machine={state_machine_arn}, execution={execution_arn}"
         )
 
         client = boto3.client("stepfunctions")
-        response = client.get_execution_history(
-            executionArn=execution_arn,
-            **pagination_options.model_dump(by_alias=True, exclude_none=True),
-        )
+        paginator = client.get_paginator("get_execution_history")
+
+        for page in paginator.paginate(executionArn=execution_arn):
+            events.extend(page.get("events", []))
 
         return {
-            "events": response.get("events", []),
-            "nextToken": response.get("nextToken"),
+            "events": events,
+            "tasks": self._group_execution_history_events(events=events),
         }
 
     def get_schedulers(self):
@@ -123,3 +147,11 @@ class AdminService(BaseService):
     def create_action(self, create_action_request: CreateActionRequest):
         client = boto3.client("lambda")
         client.get_function(FunctionName=create_action_request.arn)
+
+    def trigger_action(self, state_machine_arn: str) -> dict:
+        self.logger.info(
+            f"triggering state machine, state_machine_arn={state_machine_arn}"
+        )
+
+        client = boto3.client("stepfunctions")
+        return client.start_execution(stateMachineArn=state_machine_arn)
