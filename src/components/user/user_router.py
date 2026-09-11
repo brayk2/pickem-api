@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, status
 
 from src.components.auth.auth_models import DecodedToken
 from src.components.auth.permission_checker import PermissionChecker
+from src.components.email.email_service import EmailService
+from src.components.user.password_generator import gen_pass
 from src.components.user.user_models import (
     CreateUserDto,
     AddRoleDto,
@@ -17,21 +19,52 @@ user_router = APIRouter(
 )
 
 
-@user_router.post("", status_code=status.HTTP_201_CREATED, response_model=UserDto)
+# @user_router.post("", status_code=status.HTTP_201_CREATED, response_model=UserDto)
+# async def create_user(
+#     user_data: CreateUserDto,
+#     user_service: UserService = Depends(UserService.create),
+#     oauth_service: OAuthService = Depends(OAuthService.create),
+#     _: DecodedToken = Depends(PermissionChecker.commissioner),
+# ):
+#     user = user_service.create_user(
+#         first_name=user_data.first_name,
+#         last_name=user_data.last_name,
+#         username=user_data.username,
+#         email=user_data.email,
+#         password_hash=oauth_service.get_password_hash(password=user_data.password),
+#     )
+#     return UserDto.model_validate(user)
+
+
+@user_router.post("", status_code=status.HTTP_200_OK, response_model=UserDto)
 async def create_user(
     user_data: CreateUserDto,
     user_service: UserService = Depends(UserService.create),
     oauth_service: OAuthService = Depends(OAuthService.create),
     _: DecodedToken = Depends(PermissionChecker.commissioner),
 ):
+    # generate a password
+    password = gen_pass()
+
+    # create user
     user = user_service.create_user(
         first_name=user_data.first_name,
         last_name=user_data.last_name,
         username=user_data.username,
         email=user_data.email,
-        password_hash=oauth_service.get_password_hash(password=user_data.password),
+        password_hash=oauth_service.get_password_hash(password=password),
     )
-    return UserDto.model_validate(user)
+
+    return user_service.notify_password(user=user, password=password)
+
+
+@user_router.post("/{username}/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(
+    username: str,
+    user_service: UserService = Depends(UserService.create),
+    _: DecodedToken = Depends(PermissionChecker.commissioner),
+):
+    return user_service.reset_password(username=username)
 
 
 @user_router.post("/add-role", status_code=status.HTTP_200_OK)

@@ -1,7 +1,9 @@
 from peewee import DoesNotExist, IntegrityError
 from src.components.auth.auth_models import DecodedToken
 from src.components.auth.auth_exceptions import InvalidTokenException
+from src.components.email.email_service import EmailService
 from src.components.roles.roles_service import RolesService
+from src.components.user.password_generator import gen_pass
 from src.components.user.user_exceptions import (
     UserNotFoundException,
     PermissionDeniedException,
@@ -25,7 +27,12 @@ class UserService(BaseService):
     """
 
     @inject
-    def __init__(self, roles_service: RolesService, oauth_service: OAuthService):
+    def __init__(
+        self,
+        roles_service: RolesService,
+        oauth_service: OAuthService,
+        email_service: EmailService,
+    ):
         """
         UserService constructor.
 
@@ -33,6 +40,7 @@ class UserService(BaseService):
         """
         self.roles_service = roles_service
         self.oauth_service = oauth_service
+        self.email_service = email_service
 
     def get_user_by_username(self, username: str) -> UserModel | None:
         """
@@ -255,3 +263,40 @@ class UserService(BaseService):
             UserDto.from_orm(user)
             for user in UserModel.select().order_by(UserModel.username)
         ]
+
+    def notify_password(self, user: UserModel, password: str) -> dict:
+        # notify user with new password
+        subject = "Pickem Login Credentials"
+
+        intro = (
+            "Here are your PickEm credentials, please login and change your password.\n"
+        )
+        username_line = f"Username: {user.username}"
+        password_line = f"Password: {password}"
+        site_line = "\nWebsite: https://pickem-webapp.vercel.app/login"
+
+        body = "\n".join([intro, username_line, password_line, site_line])
+
+        message_parts = [
+            {"content": body, "subtype": "plain"},
+        ]
+
+        self.email_service.send_email(
+            recipient=user.email,
+            subject=subject,
+            message_parts=message_parts,
+            sender_email="pickem@gmail.com",  # optional override, otherwise defaults to creds.login
+        )
+
+        return {
+            "message": f"Login details sent to user {user.username} at email address: {user.email}."
+        }
+
+    def reset_password(self, username: str) -> dict:
+        user = self.get_user_by_username(username=username)
+
+        password = gen_pass()
+        user.password_hash = self.oauth_service.get_password_hash(password=password)
+        user.save()
+
+        return self.notify_password(user=user, password=password)

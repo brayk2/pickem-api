@@ -13,7 +13,9 @@ from src.models.dto.admin_dtos import ApiQuota
 from src.models.dto.group_dto import CreateGroupRequest, CreateGroupResponse
 from src.models.new_db_models import GameModel, SpreadModel, GroupModel
 
-admin_router = APIRouter(prefix="/admin", tags=["Admin"])
+admin_router = APIRouter(
+    prefix="/admin", tags=["Admin"], dependencies=[Depends(PermissionChecker.admin)]
+)
 
 
 @admin_router.post("/group", response_model=CreateGroupResponse)
@@ -80,9 +82,8 @@ async def get_schedulers(admin_service: AdminService = Depends(AdminService.crea
     return admin_service.get_schedulers()
 
 
-@admin_router.post("/action")
-async def create_action(
-    create_action_request: CreateActionRequest,
-    admin_service: AdminService = Depends(AdminService.create),
+@admin_router.post("/action/{state_machine_arn}")
+async def trigger_state_machine(
+    state_machine_arn: str, admin_service: AdminService = Depends(AdminService.create)
 ):
-    return admin_service.create_action(create_action_request=create_action_request)
+    return admin_service.trigger_action(state_machine_arn=state_machine_arn)
