@@ -70,10 +70,23 @@ class AdminService(BaseService):
 
         for page in paginator.paginate():
             for state_machine in page.get("stateMachines", []):
+                state_machine_arn = state_machine.get("stateMachineArn")
                 tags_response = client.list_tags_for_resource(
-                    resourceArn=state_machine.get("stateMachineArn")
+                    resourceArn=state_machine_arn
                 )
-                actions.append({**state_machine, "tags": tags_response.get("tags")})
+
+                tags = tags_response.get("tags", [])
+                if not any(
+                    tag.get("key") == "ENVIRONMENT"
+                    and tag.get("value") == self.settings.aws_env
+                    for tag in tags
+                ):
+                    self.logger.info(
+                        f"excluding state machine {state_machine_arn} with tags {tags}"
+                    )
+                    continue
+
+                actions.append({**state_machine, "tags": tags})
 
         return actions
 
@@ -139,8 +152,13 @@ class AdminService(BaseService):
         client = boto3.client("scheduler")
         paginator = client.get_paginator("list_schedules")
 
-        for page in paginator.paginate():
-            schedules.extend(page.get("Schedules", []))
+        for page in paginator.paginate(GroupName=self.settings.scheduler_group):
+            for scheduler in page.get("Schedules", []):
+                response = client.get_schedule(
+                    GroupName=scheduler.get("GroupName"), Name=scheduler.get("Name")
+                )
+                response.pop("ResponseMetadata")
+                schedules.append(response)
 
         return schedules
 

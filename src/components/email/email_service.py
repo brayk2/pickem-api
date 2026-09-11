@@ -4,13 +4,14 @@ from email.mime.text import MIMEText
 import logging
 import os
 
+from src.config.base_service import BaseService
 from src.config.logger import Logger
 from src.services.secret_service import SecretService
 from src.util.injection import dependency, inject
 
 
 @dependency
-class EmailService:
+class EmailService(BaseService):
     @inject
     def __init__(
         self,

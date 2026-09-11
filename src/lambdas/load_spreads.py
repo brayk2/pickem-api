@@ -16,10 +16,12 @@ def handle_event(event, context):
 
     try:
         week = season_service.get_current_week_and_year()
-        season = SeasonModel.get(year=week.get("year"))
+        year = week.get("year")
+
+        season = SeasonModel.get(year=year)
         week_model = WeekModel.get(week_number=week.get("week"), season=season)
         spread_service.load_spreads(
-            start_date=week_model.start_date, end_date=week_model.end_date
+            year=year, start_date=week_model.start_date, end_date=week_model.end_date
         )
     except Exception as e:
         logger.exception(f"failed to load spreads: {e}")

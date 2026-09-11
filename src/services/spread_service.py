@@ -32,8 +32,8 @@ class SpreadService(BaseService):
             (SpreadModel.game_id == game_id) & (SpreadModel.bookmaker == bookmaker)
         )
 
-    def load_spreads(self, start_date: datetime, end_date: datetime):
-        season_model = SeasonModel.get(year=2025)
+    def load_spreads(self, year: int, start_date: datetime, end_date: datetime):
+        season_model = SeasonModel.get(year=year)
         self.logger.info(f"using season {season_model}")
 
         response: list[OddsDto] = self.oddsapi_service.fetch_odds(
