@@ -15,6 +15,7 @@ from src.components.league.league_models import (
     LeagueRosterDto,
     LeagueSeasonDto,
 )
+from src.components.user.user_exceptions import UserNotFoundException
 from src.config.base_service import BaseService
 from src.models.db_models import (
     LeagueMemberModel,
@@ -66,6 +67,14 @@ class LeagueService(BaseService):
             # Distinguish "no such league" from "league did not run that year".
             self.get_league(league_id=league_id)
             raise LeagueSeasonNotFoundException(league_id=league_id, year=year)
+
+    def _get_user(self, username: str) -> UserModel:
+        """A typo'd username is a 404, not an uncaught DoesNotExist -> 500."""
+        try:
+            return UserModel.get(UserModel.username == username)
+        except DoesNotExist:
+            self.logger.error(f"User '{username}' not found")
+            raise UserNotFoundException(username=username)
 
     def get_membership(
         self, user: UserModel, league_season: LeagueSeasonModel
@@ -177,7 +186,7 @@ class LeagueService(BaseService):
         begins on their next token refresh.
         """
         league_season = self.get_league_season(league_id=league_id, year=year)
-        user = UserModel.get(username=username)
+        user = self._get_user(username)
 
         try:
             LeagueMemberModel.create(
@@ -204,7 +213,7 @@ class LeagueService(BaseService):
         Their existing access token still carries this league until it expires.
         """
         league_season = self.get_league_season(league_id=league_id, year=year)
-        user = UserModel.get(username=username)
+        user = self._get_user(username)
 
         membership = self.get_membership(user=user, league_season=league_season)
         if not membership:
