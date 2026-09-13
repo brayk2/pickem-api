@@ -48,3 +48,11 @@ class NotALeagueCommissionerException(HTTPException):
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"User {username} is not a commissioner of league {league_id}.",
         )
+
+
+class NotInLeagueException(HTTPException):
+    def __init__(self, username: str, league_id: int):
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"User {username} is not a member of league {league_id}.",
+        )

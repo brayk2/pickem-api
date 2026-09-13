@@ -28,7 +28,7 @@ async def get_user_pick_results(
     week: int,
     results_service: ResultsService = Depends(ResultsService.create),
     logger: Logger = Depends(Logger),
-    token: DecodedToken = Depends(LeaguePermission.member),
+    token: DecodedToken = Depends(LeaguePermission.league_member),
 ):
     logger.info(f"Getting user pick results for year {year} and week {week}")
     if picks := await results_service.get_user_pick_results(
@@ -43,6 +43,7 @@ async def get_user_pick_history(
     league_id: int,
     year: int,
     week: int,
+    _: DecodedToken = Depends(LeaguePermission.league_member),
     results_service: ResultsService = Depends(ResultsService.create),
     logger: Logger = Depends(Logger),
 ):
@@ -61,7 +62,7 @@ async def get_league_pick_results(
     year: int,
     week: int,
     results_service: ResultsService = Depends(ResultsService.create),
-    token: DecodedToken = Depends(LeaguePermission.member),
+    token: DecodedToken = Depends(LeaguePermission.league_member),
     logger: Logger = Depends(Logger),
 ):
     logger.info(f"Getting league pick results for year {year} and week {week}")
@@ -75,6 +76,7 @@ async def get_league_pick_results(
 async def get_nfl_game_results(
     year: int,
     week: int,
+    _: DecodedToken = Depends(PermissionChecker.authenticated),
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(
         default=10, ge=1, le=100, description="Number of results per page"

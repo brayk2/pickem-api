@@ -18,8 +18,12 @@ league_router = APIRouter(prefix="/league", tags=["Leagues"])
 
 
 @league_router.get("", response_model=list[LeagueDto])
-async def list_leagues(league_service: LeagueService = Depends(LeagueService.create)):
-    return league_service.list_leagues()
+async def list_leagues(
+    token: DecodedToken = Depends(PermissionChecker.authenticated),
+    league_service: LeagueService = Depends(LeagueService.create),
+):
+    """Only the caller's own leagues. Admins see every league."""
+    return league_service.list_leagues(token=token)
 
 
 @league_router.post(
@@ -38,6 +42,7 @@ async def create_league(
 @league_router.get("/{league_id}/seasons", response_model=list[LeagueSeasonDto])
 async def list_league_seasons(
     league_id: int = Path(description="The league to list seasons for."),
+    _: DecodedToken = Depends(LeaguePermission.league_member),
     league_service: LeagueService = Depends(LeagueService.create),
 ):
     return league_service.list_league_seasons(league_id=league_id)
@@ -62,6 +67,7 @@ async def start_season(
 async def get_roster(
     league_id: int,
     year: int,
+    _: DecodedToken = Depends(LeaguePermission.league_member),
     league_service: LeagueService = Depends(LeagueService.create),
 ):
     return league_service.get_roster(league_id=league_id, year=year)

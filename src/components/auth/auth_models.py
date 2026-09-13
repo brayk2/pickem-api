@@ -57,6 +57,15 @@ class DecodedToken(BaseModel):
         claim = self.leagues.get(str(league_id))
         return bool(claim and year in claim.years)
 
+    def is_in_league(self, league_id: int) -> bool:
+        """Whether the holder belongs to the league in any season.
+
+        Reading a league's history is gated on this rather than on the specific
+        season, so somebody who joins in 2026 can still see who won in 2023.
+        Writing is still gated on that season's roster -- see is_member.
+        """
+        return str(league_id) in self.leagues
+
     def is_commissioner(self, league_id: int) -> bool:
         """Whether the holder commissions that league (any season)."""
         claim = self.leagues.get(str(league_id))

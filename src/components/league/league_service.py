@@ -75,11 +75,22 @@ class LeagueService(BaseService):
             & (LeagueMemberModel.league_season == league_season.id)
         )
 
-    def list_leagues(self) -> list[LeagueDto]:
-        return [
+    def list_leagues(self, token=None) -> list[LeagueDto]:
+        """
+        Leagues the caller belongs to. Admins see all of them.
+
+        Filtering here rather than returning 403s keeps the client simple: it
+        asks for "my leagues" and gets exactly that.
+        """
+        leagues = [
             LeagueDto.model_validate(league)
             for league in LeagueModel.select().order_by(LeagueModel.name)
         ]
+
+        if token is None or token.is_admin:
+            return leagues
+
+        return [league for league in leagues if token.is_in_league(league.id)]
 
     def create_league(self, name: str, description: str | None = None) -> LeagueDto:
         self.logger.info(f"Creating league: {name}")

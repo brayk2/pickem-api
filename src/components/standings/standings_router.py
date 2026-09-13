@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, Path
+from src.components.auth.auth_models import DecodedToken
+from src.components.league.league_permission import LeaguePermission
 from src.components.standings.standings_dtos import StandingsHistoryDto, StandingsDto
 from src.components.standings.standings_service import StandingsService
 
@@ -12,6 +14,7 @@ async def get_standings_history(
     league_id: int,
     year: int,
     week: int,
+    _: DecodedToken = Depends(LeaguePermission.league_member),
     # standings_service: StandingsService = Depends(StandingsService.create),
 ):
     return await standings_service.get_standings_history(
@@ -32,6 +35,7 @@ async def get_standings(
     league_id: int = Path(description="The league to rank."),
     year: int = Path(description="The year of the NFL season."),
     week: int = Path(description="The week number within the NFL season."),
+    _: DecodedToken = Depends(LeaguePermission.league_member),
     # service: StandingsService = Depends(StandingsService.create),
 ):
     """

@@ -44,7 +44,7 @@ async def get_user_picks_for_week(
     league_id: int,
     year: int,
     week_number: int,
-    decoded_token: DecodedToken = Depends(LeaguePermission.member),
+    decoded_token: DecodedToken = Depends(LeaguePermission.league_member),
     pick_service: PickService = Depends(PickService.create),
 ):
     user = UserModel.get(username=decoded_token.sub)
