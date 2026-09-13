@@ -5,15 +5,21 @@ from src.components.pick.pick_models import (
     UserPicksDto,
     TeamDto,
 )
+from src.components.auth.auth_models import DecodedToken
+from src.components.league.league_exceptions import (
+    NotALeagueMemberException,
+)
+from src.components.league.league_service import LeagueService
 from src.components.results.results_dto import MatchupDto
 from src.config.base_service import BaseService
-from src.models.new_db_models import (
+from src.models.db_models import (
     GameModel,
     PickModel,
     UserModel,
     WeekModel,
     SeasonModel,
     GameResultModel,
+    LeagueSeasonModel,
 )
 from peewee import DoesNotExist
 from src.components.pick.pick_exceptions import (
@@ -24,14 +30,21 @@ from src.components.pick.pick_exceptions import (
     LockedPickException,
     InvalidGameWeekException,
 )
-from src.util.injection import dependency
+from src.util.injection import dependency, inject
 
 
 @dependency
 class PickService(BaseService):
     """
     Service class for handling operations related to picks in the PickEm application.
+
+    Every read and write is scoped to a league-season. The same user may play in
+    several leagues in the same year, so user + game alone does not identify a pick.
     """
+
+    @inject
+    def __init__(self, league_service: LeagueService):
+        self.league_service = league_service
 
     def validate_picks(self, picks_data: SubmitPicksRequestDto) -> None:
         """
@@ -65,7 +78,11 @@ class PickService(BaseService):
                 raise InvalidGameIDException(f"Game ID {pick.game_id} does not exist.")
 
     def create_or_update_picks(
-        self, picks_data: SubmitPicksRequestDto, user: UserModel, status: PickStatus
+        self,
+        picks_data: SubmitPicksRequestDto,
+        user: UserModel,
+        status: PickStatus,
+        league_season: LeagueSeasonModel,
     ) -> None:
         """
         Creates new picks or updates existing picks for the user in the database with the given status.
@@ -73,11 +90,14 @@ class PickService(BaseService):
         :param picks_data: The picks submitted by the user.
         :param user: The user submitting the picks.
         :param status: The status to apply to the picks.
+        :param league_season: The league-season these picks belong to.
         """
         with PickModel._meta.database.atomic():
             for pick in picks_data.picks:
                 existing_pick = PickModel.get_or_none(
-                    (PickModel.user_id == user.id) & (PickModel.game_id == pick.game_id)
+                    (PickModel.user_id == user.id)
+                    & (PickModel.league_season_id == league_season.id)
+                    & (PickModel.game_id == pick.game_id)
                 )
 
                 if existing_pick:
@@ -94,6 +114,7 @@ class PickService(BaseService):
                 else:
                     PickModel.create(
                         user=user,
+                        league_season=league_season,
                         game=pick.game_id,
                         team=pick.team_id,
                         spread_value=pick.spread_value,
@@ -106,7 +127,11 @@ class PickService(BaseService):
                     )
 
     async def submit_picks(
-        self, pick_data: SubmitPicksRequestDto, user: UserModel
+        self,
+        pick_data: SubmitPicksRequestDto,
+        user: UserModel,
+        league_id: int,
+        token: DecodedToken,
     ) -> PickStatus:
         """
         Validates, creates or updates picks, ensures the correct status is set,
@@ -119,7 +144,23 @@ class PickService(BaseService):
         :raises InvalidGameWeekException: If any pick's game does not belong to the specified year and week.
         """
         self.logger.info(
-            f"attempting to submit picks {pick_data} for user {user.username}"
+            f"attempting to submit picks {pick_data} for user {user.username} "
+            f"in league {league_id}"
+        )
+
+        # Authorize from the token. The year lives in the request body, so this
+        # cannot be a path-parameter dependency like the other league routes.
+        if not (
+            token.is_admin
+            or token.is_member(league_id=league_id, year=pick_data.year)
+        ):
+            raise NotALeagueMemberException(
+                username=user.username, league_id=league_id, year=pick_data.year
+            )
+
+        # Resolve the league-season the pick rows belong to
+        league_season = self.league_service.get_league_season(
+            league_id=league_id, year=pick_data.year
         )
 
         # Validate picks
@@ -154,6 +195,7 @@ class PickService(BaseService):
             .join(SeasonModel, on=(GameModel.season == SeasonModel.id))
             .where(
                 (PickModel.user_id == user.id)
+                & (PickModel.league_season_id == league_season.id)
                 & (WeekModel.week_number == pick_data.week)
                 & (SeasonModel.year == pick_data.year)
                 & ~(PickModel.game_id << submitted_game_ids)
@@ -170,6 +212,7 @@ class PickService(BaseService):
         # Delete picks that are from the same week and year but not in the current submission (only if they are not locked)
         PickModel.delete().where(
             (PickModel.user_id == user.id)
+            & (PickModel.league_season_id == league_season.id)
             & (PickModel.game_id.not_in(submitted_game_ids))
             & (
                 PickModel.game.in_(
@@ -185,13 +228,23 @@ class PickService(BaseService):
         ).execute()
 
         # Create or update picks with the appropriate status
-        self.create_or_update_picks(picks_data=pick_data, user=user, status=new_status)
+        self.create_or_update_picks(
+            picks_data=pick_data,
+            user=user,
+            status=new_status,
+            league_season=league_season,
+        )
 
         return new_status
 
     def get_user_picks_for_week(
-        self, user: UserModel, year: int, week_number: int
+        self, user: UserModel, year: int, week_number: int, league_id: int
     ) -> UserPicksDto:
+        # Resolve the league-season these picks belong to
+        league_season = self.league_service.get_league_season(
+            league_id=league_id, year=year
+        )
+
         # Fetch the season based on the year
         try:
             season = SeasonModel.get(SeasonModel.year == year)
@@ -217,7 +270,9 @@ class PickService(BaseService):
 
         # Fetch the user's picks for those games
         picks = PickModel.select().where(
-            (PickModel.user == user.id) & (PickModel.game << games)
+            (PickModel.user == user.id)
+            & (PickModel.league_season == league_season.id)
+            & (PickModel.game << games)
         )
 
         filtered_games = [pick.game for pick in picks]

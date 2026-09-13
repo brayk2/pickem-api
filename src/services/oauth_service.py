@@ -2,7 +2,11 @@ from datetime import datetime, timedelta
 from typing import List
 import pytz
 from jose import JWTError, jwt
-from src.components.auth.auth_models import DecodedToken, TokenResponse
+from src.components.auth.auth_models import (
+    DecodedToken,
+    LeagueClaim,
+    TokenResponse,
+)
 from src.components.auth.auth_exceptions import InvalidTokenException
 from src.config.base_service import BaseService
 from src.config.settings import Settings
@@ -90,7 +94,11 @@ class OAuthService(BaseService):
         to_encode = payload.to_dict()
         expire = datetime.now(tz=pytz.UTC) + timedelta(minutes=expires_minutes)
         self.logger.info(f"expire timestamp = {expire.timestamp()}")
-        to_encode.update({"exp": expire.timestamp() * 1000})
+        # RFC 7519: `exp` is seconds since the epoch. Writing milliseconds here
+        # made every token validate roughly 56,000 years into the future, so
+        # tokens never expired. Clients that want milliseconds get them from
+        # TokenResponse.expiration instead.
+        to_encode.update({"exp": expire.timestamp()})
 
         return (
             jwt.encode(
@@ -119,15 +127,22 @@ class OAuthService(BaseService):
         except JWTError:
             raise InvalidTokenException()
 
-    def generate_tokens(self, username: str, roles: List[str]) -> TokenResponse:
+    def generate_tokens(
+        self,
+        username: str,
+        roles: List[str],
+        leagues: dict[str, LeagueClaim] | None = None,
+    ) -> TokenResponse:
         """
         Generates both an access token and a refresh token for the user.
 
         :param username: The username to encode in the tokens.
-        :param roles: The roles associated with the user.
+        :param roles: The global roles associated with the user.
+        :param leagues: Per-league standing, so permission checks need no
+            database round trip. See LeagueService.get_league_claims.
         :return: A Token object containing the access and refresh tokens.
         """
-        payload = DecodedToken(sub=username, roles=roles)
+        payload = DecodedToken(sub=username, roles=roles, leagues=leagues or {})
         access_token, access_token_dict = self.create_access_token(payload)
         refresh_token, _ = self.create_refresh_token(payload)
 
@@ -135,5 +150,7 @@ class OAuthService(BaseService):
             token_type="Bearer",
             access_token=access_token,
             refresh_token=refresh_token,
-            expiration=access_token_dict.get("exp"),
+            # Milliseconds, unchanged, so existing clients doing `new Date(exp)`
+            # keep working. The token's own `exp` claim stays in seconds.
+            expiration=access_token_dict["exp"] * 1000,
         )

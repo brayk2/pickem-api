@@ -14,7 +14,7 @@ season_router = APIRouter(prefix="/season", tags=["Season"])
 @season_router.get("/current/week", response_model=GetCurrentWeekAndYearResponseDto)
 async def get_current_week_and_year(
     season_service: SeasonService = Depends(SeasonService.create),
-    _=Depends(PermissionChecker.player),
+    _=Depends(PermissionChecker.authenticated),
 ):
     """
     Gets the current week and year from the property table under the 'season' category.
@@ -26,7 +26,7 @@ async def get_current_week_and_year(
 async def set_current_week(
     week: int,
     season_service: SeasonService = Depends(SeasonService.create),
-    _=Depends(PermissionChecker.commissioner),
+    _=Depends(PermissionChecker.admin),
 ):
     """
     Sets the current week in the property table under the 'season' category.
@@ -37,7 +37,7 @@ async def set_current_week(
 @season_router.get("/current/year", response_model=GetCurrentYearResponseDto)
 async def get_current_year(
     season_service: SeasonService = Depends(SeasonService.create),
-    _=Depends(PermissionChecker.player),
+    _=Depends(PermissionChecker.authenticated),
 ):
     """
     Gets the current year from the property table under the 'season' category.
@@ -49,7 +49,7 @@ async def get_current_year(
 async def set_current_year(
     year: int,
     season_service: SeasonService = Depends(SeasonService.create),
-    _=Depends(PermissionChecker.commissioner),
+    _=Depends(PermissionChecker.admin),
 ):
     """
     Sets the current year in the property table under the 'season' category.
@@ -60,7 +60,7 @@ async def set_current_year(
 @season_router.get("/info")
 async def get_season_info(
     season_service: SeasonService = Depends(SeasonService.create),
-    _=Depends(PermissionChecker.player),
+    _=Depends(PermissionChecker.authenticated),
 ):
     """
     Placeholder endpoint for season info retrieval.

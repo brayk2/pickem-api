@@ -20,9 +20,25 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class LeagueClaim(BaseModel):
+    """One league's standing for the token holder.
+
+    `years` lists the seasons they are rostered in; `commissioner` is per-league
+    rather than per-season, since a season is opened with an empty roster and
+    somebody has to be able to populate it.
+    """
+
+    years: list[int] = Field(default_factory=list)
+    commissioner: bool = False
+
+
 class DecodedToken(BaseModel):
     sub: str
     roles: list[str]
+    # League standing, keyed by league id as a string (JSON object keys are
+    # strings). Written at login/refresh so permission checks need no database
+    # round trip; the 15 minute access token lifetime bounds how stale it gets.
+    leagues: dict[str, LeagueClaim] = Field(default_factory=dict)
     exp: float | None = None  # Optional expiration time
 
     @classmethod
@@ -36,6 +52,12 @@ class DecodedToken(BaseModel):
     def is_admin(self):
         return "admin" in self.roles
 
-    @property
-    def is_commissioner(self):
-        return "commissioner" in self.roles
+    def is_member(self, league_id: int, year: int) -> bool:
+        """Whether the holder is on that league's roster for that season."""
+        claim = self.leagues.get(str(league_id))
+        return bool(claim and year in claim.years)
+
+    def is_commissioner(self, league_id: int) -> bool:
+        """Whether the holder commissions that league (any season)."""
+        claim = self.leagues.get(str(league_id))
+        return bool(claim and claim.commissioner)

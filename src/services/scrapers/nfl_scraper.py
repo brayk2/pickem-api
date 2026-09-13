@@ -1,4 +1,4 @@
-from src.models.new_db_models import TeamModel
+from src.models.db_models import TeamModel
 from src.services.scrapers.base_scraper import BaseScraper
 
 

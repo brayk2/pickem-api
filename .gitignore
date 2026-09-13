@@ -8,3 +8,5 @@ poetry.lock
 *.sql
 
 prod_to_dev.sh
+# migrations are applied manually and kept out of the repo
+migrations

@@ -10,9 +10,18 @@ from src.services.oauth_service import OAuthService
 
 
 class PermissionChecker:
-    _player: str = "player"
+    """
+    Global permission gates.
+
+    Only `admin` is a global role. Everything else is scoped to a league and is
+    checked against `league_member.role` at the point where the league is known
+    -- see LeaguePermission and LeagueService.require_membership /
+    require_commissioner. League roles are deliberately absent from the token:
+    they vary per league, so putting them in the JWT would require reissuing it
+    every time someone joins a league.
+    """
+
     _admin: str = "admin"
-    _commissioner: str = "commissioner"
 
     @staticmethod
     def _get_current_user(
@@ -26,11 +35,10 @@ class PermissionChecker:
             raise InvalidTokenException
 
     @classmethod
-    def player(
+    def authenticated(
         cls, current_user: DecodedToken = Depends(_get_current_user)
     ) -> DecodedToken:
-        if cls._player not in current_user.roles:
-            raise InsufficientRoleException(role=cls._player)
+        """Any valid token. Use for routes that are not league-specific."""
         return current_user
 
     @classmethod
@@ -39,16 +47,4 @@ class PermissionChecker:
     ) -> DecodedToken:
         if cls._admin not in current_user.roles:
             raise InsufficientRoleException(role=cls._admin)
-        return current_user
-
-    @classmethod
-    def commissioner(
-        cls,
-        current_user: DecodedToken = Depends(_get_current_user),
-    ) -> DecodedToken:
-        if cls._admin in current_user.roles:
-            return current_user
-
-        if cls._commissioner not in current_user.roles:
-            raise InsufficientRoleException(role="commissioner")
         return current_user

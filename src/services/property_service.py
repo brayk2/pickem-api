@@ -1,5 +1,5 @@
 from src.config.base_service import BaseService
-from src.models.new_db_models import PropertyModel
+from src.models.db_models import PropertyModel
 from src.util.injection import dependency, inject
 
 

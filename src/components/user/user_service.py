@@ -15,7 +15,7 @@ from src.components.user.user_models import (
     UpdateUserRequest,
 )
 from src.config.base_service import BaseService
-from src.models.new_db_models import UserModel
+from src.models.db_models import UserModel
 from src.services.oauth_service import OAuthService
 from src.util.injection import dependency, inject
 
@@ -116,14 +116,13 @@ class UserService(BaseService):
         user.last_name = last_name
         user.save()
 
-        self.logger.info(f"Assigning default role to user: {username}")
-        default_role = self.roles_service.get_default_role()
-        self.add_user_to_role(username=user.username, role_name=default_role.name)
-
+        # No global role is assigned on creation: being a player is a property of
+        # league membership (league_member), not a system-wide role. Only `admin`
+        # lives in the global group table.
         for group in groups or []:
             self.add_user_to_role(username=user.username, role_name=group)
 
-        self.logger.info(f"User '{username}' created successfully with default role.")
+        self.logger.info(f"User '{username}' created successfully.")
         return user
 
     def delete_user(self, username: str) -> None:
@@ -184,9 +183,6 @@ class UserService(BaseService):
                 f"user {token.sub} is attempting to update a user profile that is not theirs"
             )
             if token.is_admin:
-                self.logger.info("user is admin, allowing profile update")
-                return
-            elif token.is_commissioner:
                 self.logger.info("user is admin, allowing profile update")
                 return
             raise PermissionDeniedException(

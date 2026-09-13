@@ -1,7 +1,7 @@
 from functools import wraps
 
 from src.config.logger import Logger
-from src.models.new_db_models import database
+from src.models.db_models import database
 
 
 def connect_db(func):

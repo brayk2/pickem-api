@@ -1,7 +1,7 @@
 from src.components.season.season_service import SeasonService
 from src.config.logger import Logger
 from src.lambdas.utils import connect_db
-from src.models.new_db_models import WeekModel, SeasonModel
+from src.models.db_models import WeekModel, SeasonModel
 from src.services.spread_service import SpreadService
 
 logger = Logger()

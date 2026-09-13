@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends
 
 from src.components.auth.permission_checker import PermissionChecker
 from src.models.dto.dto import Game
-from src.models.new_db_models import GameModel, SeasonModel
+from src.models.db_models import GameModel, SeasonModel
 
 game_router = APIRouter(
-    prefix="/game", tags=["Game"], dependencies=[Depends(PermissionChecker.player)]
+    prefix="/game", tags=["Game"], dependencies=[Depends(PermissionChecker.authenticated)]
 )
 
 

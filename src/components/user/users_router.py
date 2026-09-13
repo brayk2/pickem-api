@@ -6,7 +6,7 @@ from src.components.user.user_models import UserDto
 from src.components.user.user_service import UserService
 
 users_router = APIRouter(
-    prefix="/users", tags=["Users"], dependencies=[Depends(PermissionChecker.player)]
+    prefix="/users", tags=["Users"], dependencies=[Depends(PermissionChecker.authenticated)]
 )
 
 

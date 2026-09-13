@@ -8,6 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.components.admin.admin_router import admin_router
 from src.api.routes.game_router import game_router
+from src.components.league.league_router import league_router
 from src.components.pick.pick_router import picks_router
 from src.api.routes.scrape_router import scrape_router
 from src.api.routes.spread_router import spread_router
@@ -20,7 +21,7 @@ from src.components.user.user_router import user_router
 from src.components.season.season_router import season_router
 from src.components.user.users_router import users_router
 from src.config.logger import Logger
-from src.models.new_db_models import database
+from src.models.db_models import database
 
 app = FastAPI(title="PickEm Api", version="0.0.1", root_path="/api")
 logger = Logger()
@@ -73,6 +74,7 @@ app.include_router(users_router)
 app.include_router(roles_router)
 app.include_router(results_router)
 app.include_router(standings_router)
+app.include_router(league_router)
 
 # old route structure
 # api.include_router(auth_router)
