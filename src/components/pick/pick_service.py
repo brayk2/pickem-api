@@ -1,3 +1,4 @@
+from src.components.pick.kickoff import has_started
 from src.components.pick.pick_models import (
     PickStatus,
     SubmitPicksRequestDto,
@@ -126,6 +127,47 @@ class PickService(BaseService):
                         f"and user ID {user.id}"
                     )
 
+    @staticmethod
+    def _is_same_pick(existing: PickModel, submitted) -> bool:
+        """Whether a submitted pick matches what is already stored."""
+        return (
+            existing.team_id == submitted.team_id
+            and int(existing.confidence) == int(submitted.confidence)
+            # spread_value is a DecimalField on one side and a float on the
+            # other; compare at the two places the column actually stores.
+            and round(float(existing.spread_value), 2)
+            == round(float(submitted.spread_value), 2)
+        )
+
+    def _reject_changes_to_started_games(
+        self,
+        picks_data: SubmitPicksRequestDto,
+        started_game_ids: list[int],
+        existing_by_game: dict,
+    ) -> None:
+        """
+        Server-side kickoff enforcement.
+
+        The UI hides started games, but nothing stopped a direct API call from
+        picking a game after it had begun -- and a timezone bug in the webapp
+        made that reachable by accident for anyone west of US Eastern.
+        """
+        for pick in picks_data.picks:
+            if pick.game_id not in started_game_ids:
+                continue
+
+            current = existing_by_game.get(pick.game_id)
+            if current is not None and self._is_same_pick(current, pick):
+                continue
+
+            self.logger.warning(
+                f"Rejected a pick for game {pick.game_id}, which has started"
+            )
+            raise LockedPickException(
+                f"Game {pick.game_id} has already started; its pick can no longer be "
+                f"set or changed."
+            )
+
     async def submit_picks(
         self,
         pick_data: SubmitPicksRequestDto,
@@ -187,8 +229,20 @@ class PickService(BaseService):
                     expected_week=pick_data.week,
                 )
 
-        # Fetch existing picks that are from the same week and year but not in the current submission
-        existing_picks = (
+        # Every game in the week, so a started game can be protected whether or
+        # not the submission happens to mention it.
+        week_games = list(
+            GameModel.select()
+            .join(WeekModel, on=(GameModel.week == WeekModel.id))
+            .join(SeasonModel, on=(GameModel.season == SeasonModel.id))
+            .where(
+                (WeekModel.week_number == pick_data.week)
+                & (SeasonModel.year == pick_data.year)
+            )
+        )
+        started_game_ids = [game.id for game in week_games if has_started(game)]
+
+        existing_picks = list(
             PickModel.select()
             .join(GameModel, on=(PickModel.game == GameModel.id))
             .join(WeekModel, on=(GameModel.week == WeekModel.id))
@@ -198,22 +252,35 @@ class PickService(BaseService):
                 & (PickModel.league_season_id == league_season.id)
                 & (WeekModel.week_number == pick_data.week)
                 & (SeasonModel.year == pick_data.year)
-                & ~(PickModel.game_id << submitted_game_ids)
             )
         )
+        existing_by_game = {pick.game_id: pick for pick in existing_picks}
 
-        # Check if any of the existing picks are locked
+        # A started game's pick is frozen. The client resubmits it unchanged as
+        # part of the week's full slate, so an identical value is allowed
+        # through; anything else is an attempt to pick after kickoff.
+        self._reject_changes_to_started_games(
+            picks_data=pick_data,
+            started_game_ids=started_game_ids,
+            existing_by_game=existing_by_game,
+        )
+
+        # Refuse to drop a pick whose game has started, however the submission
+        # arrived -- omitting it would otherwise delete it below.
         for pick in existing_picks:
-            if pick.status == PickStatus.Locked:
+            if pick.game_id not in submitted_game_ids and (
+                pick.game_id in started_game_ids
+                or pick.status == PickStatus.Locked
+            ):
                 raise LockedPickException(
                     f"Pick for game ID {pick.game_id} is locked and cannot be removed."
                 )
 
-        # Delete picks that are from the same week and year but not in the current submission (only if they are not locked)
+        # Delete picks from this week that were left out of the submission.
         PickModel.delete().where(
             (PickModel.user_id == user.id)
             & (PickModel.league_season_id == league_season.id)
-            & (PickModel.game_id.not_in(submitted_game_ids))
+            & (PickModel.game_id.not_in(submitted_game_ids + started_game_ids))
             & (
                 PickModel.game.in_(
                     GameModel.select(GameModel.id)
