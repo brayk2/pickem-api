@@ -11,7 +11,7 @@ from src.config.logger import Logger
 from src.models.dto.action_dto import CreateActionRequest
 from src.models.dto.admin_dtos import ApiQuota
 from src.models.dto.group_dto import CreateGroupRequest, CreateGroupResponse
-from src.models.new_db_models import GameModel, SpreadModel, GroupModel
+from src.models.db_models import GameModel, SpreadModel, GroupModel
 
 admin_router = APIRouter(
     prefix="/admin", tags=["Admin"], dependencies=[Depends(PermissionChecker.admin)]
@@ -29,7 +29,7 @@ async def create_group(
 @admin_router.get("/api-quota", response_model=ApiQuota)
 async def get_quota(
     admin_service: AdminService = Depends(AdminService.create),
-    _: DecodedToken = Depends(PermissionChecker.commissioner),
+    _: DecodedToken = Depends(PermissionChecker.admin),
     # logger: Logger = Depends(Logger),
 ):
     """Gets the odds API quota."""

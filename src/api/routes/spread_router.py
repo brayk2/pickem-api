@@ -8,7 +8,7 @@ spread_service = SpreadService()
 spread_router = APIRouter(
     prefix="/spreads",
     tags=["Spreads"],
-    dependencies=[Depends(PermissionChecker.player)],
+    dependencies=[Depends(PermissionChecker.authenticated)],
 )
 
 

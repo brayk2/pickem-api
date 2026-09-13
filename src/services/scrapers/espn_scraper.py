@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytz
 
-from src.models.new_db_models import (
+from src.models.db_models import (
     GameModel,
     SeasonModel,
     WeekModel,

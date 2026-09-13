@@ -11,7 +11,7 @@ from src.components.results.results_dto import (
     MatchupDto,  # New DTO to encapsulate results by week
 )
 from src.config.base_service import BaseService
-from src.models.new_db_models import (
+from src.models.db_models import (
     PickModel,
     UserModel,
     GameResultModel,
@@ -20,6 +20,7 @@ from src.models.new_db_models import (
     SeasonModel,
     WeekModel,
 )
+from src.components.league.league_service import LeagueService
 from src.util.injection import dependency, inject
 
 _user = UserModel.alias()
@@ -36,20 +37,25 @@ _week_model = WeekModel.alias()
 @dependency
 class ResultsService(BaseService):
     @inject
-    def __init__(self):
+    def __init__(self, league_service: LeagueService):
         super().__init__()
+        self.league_service = league_service
 
     async def _get_pick_results(
-        self, year: int, week_condition, user: str = None
+        self, year: int, week_condition, league_id: int, user: str = None
     ) -> list[UserPickResultsDto]:
         """
-        get list of all picks filtered by user and week
+        get list of all picks filtered by league, user and week
 
         :param year:
         :param week_condition:
+        :param league_id: the league whose picks to return
         :param user:
         :return:
         """
+        league_season = self.league_service.get_league_season(
+            league_id=league_id, year=year
+        )
         query = (
             _pick.select(
                 _pick.id,
@@ -89,6 +95,7 @@ class ResultsService(BaseService):
             .join(_week_model, on=(_game.week == _week_model.id))
             .where(
                 _season.year == year,
+                _pick.league_season == league_season.id,
                 week_condition,
                 _game_result.home_score.is_null(False),  # Ensure the game has concluded
                 _game_result.away_score.is_null(False),  # Ensure the game has concluded
@@ -185,23 +192,32 @@ class ResultsService(BaseService):
         return [UserPickResultsDto(**result) for result in sorted_results]
 
     async def get_user_pick_results(
-        self, year: int, week: int, user: str = None
+        self, year: int, week: int, league_id: int, user: str = None
     ) -> list[UserPickResultsDto]:
         week_condition = _week_model.week_number == week
-        return await self._get_pick_results(year, week_condition, user)
+        return await self._get_pick_results(
+            year, week_condition, league_id=league_id, user=user
+        )
 
     import asyncio
 
     async def get_pick_history_for_year(
-        self, year: int, week: int, user: str = None
+        self, year: int, week: int, league_id: int, user: str = None
     ) -> list[UserPickResultsDto]:
         return await self._get_pick_results(
-            year=year, week_condition=_week_model.week_number <= week, user=user
+            year=year,
+            week_condition=_week_model.week_number <= week,
+            league_id=league_id,
+            user=user,
         )
 
-    async def _get_week_results_task(self, year: int, week: int, user: str):
+    async def _get_week_results_task(
+        self, year: int, week: int, league_id: int, user: str
+    ):
         week_condition = _week_model.week_number == week
-        results = await self._get_pick_results(year, week_condition, user)
+        results = await self._get_pick_results(
+            year, week_condition, league_id=league_id, user=user
+        )
         return WeekResultsDto(week=week, results=results)
 
     async def get_league_results(

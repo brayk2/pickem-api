@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, Path
+from src.components.auth.auth_models import DecodedToken
+from src.components.league.league_permission import LeaguePermission
 from src.components.standings.standings_dtos import StandingsHistoryDto, StandingsDto
 from src.components.standings.standings_service import StandingsService
 
@@ -7,17 +9,21 @@ standings_router = APIRouter(prefix="/standings", tags=["Standings"])
 standings_service = StandingsService()
 
 
-@standings_router.get("/{year}/{week}/history", response_model=StandingsHistoryDto)
+@standings_router.get("/{league_id}/{year}/{week}/history", response_model=StandingsHistoryDto)
 async def get_standings_history(
+    league_id: int,
     year: int,
     week: int,
+    _: DecodedToken = Depends(LeaguePermission.league_member),
     # standings_service: StandingsService = Depends(StandingsService.create),
 ):
-    return await standings_service.get_standings_history(year, week)
+    return await standings_service.get_standings_history(
+        year, week, league_id=league_id
+    )
 
 
 @standings_router.get(
-    "/{year}/{week}",
+    "/{league_id}/{year}/{week}",
     response_model=list[StandingsDto],
     summary="Get Standings for a Specific Week",
     responses={
@@ -26,8 +32,10 @@ async def get_standings_history(
     },
 )
 async def get_standings(
+    league_id: int = Path(description="The league to rank."),
     year: int = Path(description="The year of the NFL season."),
     week: int = Path(description="The week number within the NFL season."),
+    _: DecodedToken = Depends(LeaguePermission.league_member),
     # service: StandingsService = Depends(StandingsService.create),
 ):
     """
@@ -62,4 +70,6 @@ async def get_standings(
     Returns:
     - A list of standings for the specified week, each containing the username, rank, win percentage, and total score.
     """
-    return await standings_service.get_standings_for_week(year=year, week=week)
+    return await standings_service.get_standings_for_week(
+        year=year, week=week, league_id=league_id
+    )

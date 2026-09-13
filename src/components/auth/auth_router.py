@@ -5,6 +5,7 @@ from src.components.auth.auth_models import (
     TokenRefreshRequest,
 )
 from src.components.auth.auth_exceptions import IncorrectCredentialsException
+from src.components.league.league_service import LeagueService
 from src.components.roles.roles_service import RolesService
 from src.services.oauth_service import OAuthService
 from src.components.user.user_service import UserService
@@ -18,6 +19,7 @@ async def login_for_access_token(
     oauth_service: OAuthService = Depends(OAuthService.create),
     user_service: UserService = Depends(UserService.create),
     roles_service: RolesService = Depends(RolesService.create),
+    league_service: LeagueService = Depends(LeagueService.create),
 ):
     # Validate user credentials
     user = user_service.get_user_by_username(form_data.username)
@@ -26,11 +28,14 @@ async def login_for_access_token(
     ):
         raise IncorrectCredentialsException()
 
-    # Get roles for user
+    # Get global roles and per-league standing for the user
     roles = roles_service.get_roles_for_user(user=user)
+    leagues = league_service.get_league_claims(user=user)
 
-    # Use OAuthService to generate tokens, including fetching roles
-    tokens = oauth_service.generate_tokens(username=user.username, roles=roles)
+    # Use OAuthService to generate tokens, including roles and league claims
+    tokens = oauth_service.generate_tokens(
+        username=user.username, roles=roles, leagues=leagues
+    )
 
     return tokens
 
@@ -41,19 +46,21 @@ async def refresh_access_token(
     user_service: UserService = Depends(UserService.create),
     oauth_service: OAuthService = Depends(OAuthService.create),
     roles_service: RolesService = Depends(RolesService.create),
+    league_service: LeagueService = Depends(LeagueService.create),
 ):
     # Decode the token
     decoded_token = oauth_service.decode_token(token_refresh_request.refresh_token)
 
-    # Validate the token and fetch roles
-    validated_token = roles_service.get_roles_for_user(
-        user_service.get_user_by_username(decoded_token.sub)
-    )
+    # Re-read roles and league standing so a refresh picks up roster changes
+    user = user_service.get_user_by_username(decoded_token.sub)
+    roles = roles_service.get_roles_for_user(user)
+    leagues = league_service.get_league_claims(user=user)
 
     # Generate new tokens
     tokens = oauth_service.generate_tokens(
         username=decoded_token.sub,
-        roles=validated_token,
+        roles=roles,
+        leagues=leagues,
     )
 
     return tokens

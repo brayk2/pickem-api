@@ -15,7 +15,7 @@ from src.components.user.user_service import UserService
 from src.services.oauth_service import OAuthService
 
 user_router = APIRouter(
-    prefix="/user", tags=["User"], dependencies=[Depends(PermissionChecker.player)]
+    prefix="/user", tags=["User"], dependencies=[Depends(PermissionChecker.authenticated)]
 )
 
 
@@ -24,7 +24,7 @@ user_router = APIRouter(
 #     user_data: CreateUserDto,
 #     user_service: UserService = Depends(UserService.create),
 #     oauth_service: OAuthService = Depends(OAuthService.create),
-#     _: DecodedToken = Depends(PermissionChecker.commissioner),
+#     _: DecodedToken = Depends(PermissionChecker.admin),
 # ):
 #     user = user_service.create_user(
 #         first_name=user_data.first_name,
@@ -41,7 +41,7 @@ async def create_user(
     user_data: CreateUserDto,
     user_service: UserService = Depends(UserService.create),
     oauth_service: OAuthService = Depends(OAuthService.create),
-    _: DecodedToken = Depends(PermissionChecker.commissioner),
+    _: DecodedToken = Depends(PermissionChecker.admin),
 ):
     # generate a password
     password = gen_pass()
@@ -62,7 +62,7 @@ async def create_user(
 async def reset_password(
     username: str,
     user_service: UserService = Depends(UserService.create),
-    _: DecodedToken = Depends(PermissionChecker.commissioner),
+    _: DecodedToken = Depends(PermissionChecker.admin),
 ):
     return user_service.reset_password(username=username)
 
@@ -90,12 +90,12 @@ async def delete_user(
     "/password",
     status_code=status.HTTP_200_OK,
     response_model=UserDto,
-    response_model_exclude={"is_admin", "is_commissioner"},
+    response_model_exclude={"is_admin"},
 )
 async def update_password(
     request: UpdateUserPasswordRequest,
     user_service: UserService = Depends(UserService.create),
-    token: DecodedToken = Depends(PermissionChecker.player),
+    token: DecodedToken = Depends(PermissionChecker.authenticated),
 ):
     return user_service.update_password(
         username=token.sub,
@@ -107,13 +107,13 @@ async def update_password(
     "/{username}",
     status_code=status.HTTP_200_OK,
     response_model=UserDto,
-    response_model_exclude={"is_admin", "is_commissioner"},
+    response_model_exclude={"is_admin"},
 )
 async def update_user_profile(
     username: str,
     request: UpdateUserRequest,
     user_service: UserService = Depends(UserService.create),
-    token: DecodedToken = Depends(PermissionChecker.player),
+    token: DecodedToken = Depends(PermissionChecker.authenticated),
 ):
     return user_service.update_user_profile(
         username=username,
@@ -125,7 +125,7 @@ async def update_user_profile(
 @user_router.get("", status_code=status.HTTP_200_OK, response_model=UserDto)
 async def get_user_from_token(
     user_service: UserService = Depends(UserService.create),
-    token: DecodedToken = Depends(PermissionChecker.player),
+    token: DecodedToken = Depends(PermissionChecker.authenticated),
 ):
     return user_service.get_user(username=token.sub)
 

@@ -5,7 +5,7 @@ from peewee import fn, Case, JOIN
 
 from src.components.results.results_dto import MatchupDto, TeamDto
 from src.config.base_service import BaseService
-from src.models.new_db_models import (
+from src.models.db_models import (
     SpreadModel,
     GameModel,
     TeamModel,

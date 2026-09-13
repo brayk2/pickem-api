@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+
+from src.components.auth.permission_checker import PermissionChecker
 
 from src.services.scrapers.espn_scraper import EspnScraper
 from src.services.scrapers.nfl_scraper import NflScraper
@@ -9,7 +11,13 @@ pfr_scraper = PfrScraper()
 espn_scraper = EspnScraper()
 nfl_scraper = NflScraper()
 
-scrape_router = APIRouter(prefix="/scrape", tags=["Scraper"])
+# These write to the database (teams, schedules, thumbnails), so they are
+# admin-only rather than open to anyone who knows the path.
+scrape_router = APIRouter(
+    prefix="/scrape",
+    tags=["Scraper"],
+    dependencies=[Depends(PermissionChecker.admin)],
+)
 
 
 class GenericResponse(BaseModel):

@@ -4,7 +4,7 @@ from src.components.season.season_service import SeasonService
 from src.config.base_service import BaseService
 from src.config.logger import Logger
 from src.lambdas.utils import connect_db
-from src.models.new_db_models import WeekModel
+from src.models.db_models import WeekModel
 from src.util.injection import dependency, inject
 
 

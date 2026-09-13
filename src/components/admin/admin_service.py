@@ -7,7 +7,7 @@ from src.models.dto.action_dto import CreateActionRequest, ActionType
 from src.models.dto.week_dto import WeekDto
 from src.util.injection import dependency, inject
 from src.services.property_service import PropertyService
-from src.models.new_db_models import PropertyModel, WeekModel, SeasonModel
+from src.models.db_models import PropertyModel, WeekModel, SeasonModel
 
 
 class PaginationOptions(BaseModel):

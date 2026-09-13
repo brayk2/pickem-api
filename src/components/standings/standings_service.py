@@ -1,6 +1,7 @@
 import asyncio
 
 from src.components.results.results_dto import UserPickResultsDto, PickDto
+from src.components.league.league_service import LeagueService
 from src.components.results.results_service import ResultsService
 from src.components.standings.standings_dtos import (
     StandingsDto,
@@ -15,11 +16,17 @@ from src.util.injection import dependency, inject
 @dependency
 class StandingsService(BaseService):
     @inject
-    def __init__(self, results_service: ResultsService, logger: Logger):
+    def __init__(
+        self,
+        results_service: ResultsService,
+        league_service: LeagueService,
+        logger: Logger,
+    ):
         """
         Initializes the StandingsService
         """
         self.results_service = results_service
+        self.league_service = league_service
         self.logger = logger
 
     @staticmethod
@@ -39,15 +46,35 @@ class StandingsService(BaseService):
     async def _aggregate_scores(picks: list[PickDto]) -> int:
         return sum(pick.score for pick in picks if pick.score is not None)
 
-    async def get_standings_for_week(self, year: int, week: int) -> list[StandingsDto]:
+    async def get_standings_for_week(
+        self, year: int, week: int, league_id: int
+    ) -> list[StandingsDto]:
         # Fetch user pick results up to the specified year and week
-        self.logger.info(f"Fetching standings for year {year} up to week {week}")
-
-        pick_results: list[UserPickResultsDto] = (
-            await self.results_service.get_pick_history_for_year(year=year, week=week)
+        self.logger.info(
+            f"Fetching standings for league {league_id}, year {year} up to week {week}"
         )
 
-        user_aggregated_results = {}
+        league_season = self.league_service.get_league_season(
+            league_id=league_id, year=year
+        )
+
+        pick_results: list[UserPickResultsDto] = (
+            await self.results_service.get_pick_history_for_year(
+                year=year, week=week, league_id=league_id
+            )
+        )
+
+        # Seed from the roster, not from pick activity, so a member who missed
+        # every week so far still appears at zero rather than vanishing.
+        user_aggregated_results = {
+            member.username: {
+                "picks": [],
+                "total_score": 0,
+                "correct_picks": 0,
+                "total_picks": 0,
+            }
+            for member in self.league_service.list_members(league_season=league_season)
+        }
 
         # Accumulate results across all weeks up to the specified week
         for user_picks in pick_results:
@@ -96,7 +123,9 @@ class StandingsService(BaseService):
 
         return standings
 
-    async def get_standings_history(self, year: int, week: int) -> StandingsHistoryDto:
+    async def get_standings_history(
+        self, year: int, week: int, league_id: int
+    ) -> StandingsHistoryDto:
         weeks = list(range(1, week + 1))
         self.logger.info(f"Defined weeks as {weeks}")
 
@@ -105,7 +134,9 @@ class StandingsService(BaseService):
         async def fetch_week_standings(w):
             async with semaphore:
                 try:
-                    standings = await self.get_standings_for_week(year, w)
+                    standings = await self.get_standings_for_week(
+                        year, w, league_id=league_id
+                    )
                     return w, standings  # Return the week number along with standings
                 except Exception as e:
                     self.logger.error(f"Error fetching standings for week {w}: {e}")

@@ -1,6 +1,6 @@
 from playhouse.shortcuts import model_to_dict
 
-from src.models.new_db_models import TeamModel, SeasonModel
+from src.models.db_models import TeamModel, SeasonModel
 from src.services.scrapers.base_scraper import BaseScraper
 
 

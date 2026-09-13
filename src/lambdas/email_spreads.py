@@ -3,7 +3,7 @@ import asyncio
 from src.components.email.email_service import EmailService
 from src.components.email.utils import generate_html_table
 from src.components.season.season_service import SeasonService
-from src.models.new_db_models import UserModel
+from src.models.db_models import UserModel
 from src.services.spread_service import SpreadService
 
 

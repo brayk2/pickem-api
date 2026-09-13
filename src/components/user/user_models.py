@@ -71,7 +71,3 @@ class UserDto(BaseDto):
     def is_admin(self) -> bool:
         return "admin" in self.groups
 
-    @computed_field(alias="isCommissioner")
-    @property
-    def is_commissioner(self) -> bool:
-        return "commissioner" in self.groups

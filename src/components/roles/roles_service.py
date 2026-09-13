@@ -3,7 +3,7 @@ from typing import List
 
 from src.components.user.user_exceptions import UserNotFoundException
 from src.config.base_service import BaseService
-from src.models.new_db_models import GroupModel, UserModel, UserGroupModel
+from src.models.db_models import GroupModel, UserModel, UserGroupModel
 from src.components.roles.roles_exceptions import (
     RoleNotFoundException,
     RoleAlreadyExistsException,
@@ -15,7 +15,10 @@ from src.util.injection import dependency
 @dependency
 class RolesService(BaseService):
     """
-    Service class for managing roles and role-related operations.
+    Service class for managing global roles.
+
+    Only system-wide roles (`admin`) live here. Participation in a league and
+    the commissioner role are held in league_member.role -- see LeagueService.
     """
 
     def create_role(self, name: str, description: str | None = None) -> RoleDto:
@@ -128,18 +131,3 @@ class RolesService(BaseService):
         self.logger.info(f"Retrieved {len(role_dtos)} roles.")
         return role_dtos
 
-    def get_default_role(self) -> GroupModel:
-        """
-        Retrieves the default role to be assigned to new users.
-
-        :return: The default GroupModel instance.
-        :raises RoleNotFoundException: If the default role does not exist.
-        """
-        self.logger.info("Fetching default role")
-        try:
-            default_role = GroupModel.get(GroupModel.name == "player")
-            self.logger.info("Default role 'player' retrieved successfully.")
-            return default_role
-        except DoesNotExist:
-            self.logger.error("Default role 'player' not found.")
-            raise RoleNotFoundException(role_name="player")
