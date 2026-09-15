@@ -4,15 +4,16 @@ from statistics import mean, median
 from src.components.results.results_dto import TeamDto
 from src.components.results.results_stats_dto import (
     ConfidenceBreakdownDto,
+    GameAwardDto,
     GameBreakdownDto,
-    MarginPickDto,
     NotablePickDto,
-    PlayerConvictionDto,
+    PickAwardDto,
+    PlayerAwardDto,
     PlayerScoreDto,
+    SideAwardDto,
     SideBreakdownDto,
-    SoloHitDto,
+    WeekAwardsDto,
     WeekStatsDto,
-    WeekSuperlativesDto,
 )
 from src.components.results.results_service import ResultsService
 from src.components.week.week_service import WeekService
@@ -23,10 +24,15 @@ from src.util.injection import dependency, inject
 # is excluded from hit rates rather than counted against them.
 GRADED_STATUSES = ("COVERED", "FAILED")
 
-# A pick decided by a field goal or less was a coin flip dressed up as a read.
-# Wide enough to catch the hook and the three, narrow enough to stay a story.
-PHOTO_FINISH_MARGIN = 3.0
-MAX_PHOTO_FINISHES = 4
+# A side under half of a game's picks is the contrarian one -- but only once
+# enough people took the game for "contrarian" to mean anything. One of three is
+# arithmetically a minority and socially nothing.
+MINORITY_SHARE = 0.5
+MIN_PICKS_FOR_MINORITY = 4
+
+# Everyone submits five picks at 5-4-3-2-1, so a perfect week is all five of
+# them covering. A push is a refund, not a hit, and doesn't qualify.
+PERFECT_WEEK_PICKS = 5
 
 
 def _team_dto(row: dict, prefix: str) -> TeamDto:
@@ -108,8 +114,6 @@ class ResultsStatsService(BaseService):
             return WeekStatsDto(year=year, week=week, completed=True)
 
         games = self._build_game_breakdowns(picks)
-        sides = [side for game in games for side in (game.home, game.away)]
-        picked_sides = [side for side in sides if side.pick_count]
 
         statuses = Counter(pick["pick_status"] for pick in picks)
         decided = sum(statuses[status] for status in GRADED_STATUSES)
@@ -125,9 +129,6 @@ class ResultsStatsService(BaseService):
             average_score=_average([player.score for player in scores]),
             median_score=round(median([player.score for player in scores]), 2),
             hit_rate=_rate(statuses["COVERED"], decided),
-            most_popular_pick=self._pick_extreme(picked_sides, "pick_count"),
-            most_correct_pick=self._pick_extreme(picked_sides, "covered_count"),
-            most_missed_pick=self._pick_extreme(picked_sides, "failed_count"),
             unanimous_picks=[
                 _notable(side)
                 for game in games
@@ -137,7 +138,7 @@ class ResultsStatsService(BaseService):
             ],
             confidence_breakdown=self._confidence_breakdown(picks),
             games=games,
-            superlatives=self._superlatives(picks, games, scores),
+            awards=self._awards(picks, games, scores),
         )
 
     def _build_game_breakdowns(self, picks: list[dict]) -> list[GameBreakdownDto]:
@@ -237,17 +238,295 @@ class ResultsStatsService(BaseService):
             key=lambda player: (-player.score, player.username),
         )
 
+    # ------------------------------------------------------------------ awards
+
+    def _awards(
+        self,
+        picks: list[dict],
+        games: list[GameBreakdownDto],
+        scores: list[PlayerScoreDto],
+    ) -> WeekAwardsDto:
+        """
+        The week's stories. Every one of these is optional: an award with no
+        real winner is left out rather than handed to whoever came closest.
+        """
+        by_game = {game.game_id: game for game in games}
+
+        # Confidence backing each side, which pick counts alone can't show: the
+        # side eight people took at 1 point is not the side eight people took
+        # at 5. Built from the raw picks rather than average x count so it
+        # doesn't inherit the average's rounding.
+        weight: dict[tuple[int, int], float] = defaultdict(float)
+        for pick in picks:
+            weight[(pick["game_id"], pick["selected_team_id"])] += float(
+                pick["confidence"]
+            )
+
+        sides = [(game, side) for game in games for side in (game.home, game.away)]
+
+        return WeekAwardsDto(
+            player_of_the_week=self._best_scorers(scores),
+            perfect_week=self._perfect_week(scores),
+            ice_cold=self._worst_scorers(scores),
+            value_hunter=self._top_by_pick(
+                picks,
+                by_game,
+                lambda pick, side: (
+                    float(pick["score"])
+                    if self._is_minority(by_game[pick["game_id"]], side)
+                    else 0.0
+                ),
+            ),
+            dog_lover=self._top_by_pick(
+                picks,
+                by_game,
+                lambda pick, side: (
+                    float(pick["score"]) if float(pick["spread_value"]) > 0 else 0.0
+                ),
+            ),
+            oracle=self._oracle(picks, by_game, weight),
+            **self._consensus_awards(sides, weight),
+            sleeper=self._sleeper(sides, weight),
+            split_decision=self._split_decision(games),
+            **self._margin_awards(sides, weight),
+        )
+
+    @classmethod
+    def _margin_awards(cls, sides, weight) -> dict:
+        """
+        The widest cover and the narrowest one. In a week with a single cover
+        they are the same side, and one card saying it twice is worse than one
+        card saying it once -- so the photo finish stands down.
+        """
+        covers = [(game, side) for game, side in sides if side.margin > 0]
+        if not covers:
+            return {"biggest_cover": None, "photo_finish": None}
+
+        widest = cls._side_award(*max(covers, key=lambda p: p[1].margin), weight)
+        narrowest = cls._side_award(*min(covers, key=lambda p: p[1].margin), weight)
+
+        same = (
+            widest.game_id == narrowest.game_id
+            and widest.team.team_id == narrowest.team.team_id
+        )
+        return {
+            "biggest_cover": widest,
+            "photo_finish": None if same else narrowest,
+        }
+
     @staticmethod
-    def _pick_extreme(
-        sides: list[SideBreakdownDto], field: str
-    ) -> NotablePickDto | None:
-        """The side with the most of `field`, or None when no side has any."""
-        if not sides:
+    def _is_minority(game: GameBreakdownDto, side: SideBreakdownDto) -> bool:
+        return (
+            game.pick_count >= MIN_PICKS_FOR_MINORITY
+            and side.pick_share < MINORITY_SHARE
+        )
+
+    @staticmethod
+    def _side_of(game: GameBreakdownDto, pick: dict) -> SideBreakdownDto | None:
+        if pick["selected_team_id"] == game.home.team.team_id:
+            return game.home
+        if pick["selected_team_id"] == game.away.team.team_id:
+            return game.away
+        return None
+
+    @staticmethod
+    def _player_award(players: list[PlayerScoreDto], value: float) -> PlayerAwardDto:
+        """Several winners share one card rather than one being picked at
+        random -- ties are common with five picks each."""
+        return PlayerAwardDto(
+            usernames=[player.username for player in players],
+            value=round(value, 2),
+            covered_count=players[0].covered_count if len(players) == 1 else 0,
+            failed_count=players[0].failed_count if len(players) == 1 else 0,
+            pushed_count=players[0].pushed_count if len(players) == 1 else 0,
+        )
+
+    @classmethod
+    def _best_scorers(cls, scores: list[PlayerScoreDto]) -> PlayerAwardDto | None:
+        if not scores:
             return None
-        best = max(sides, key=lambda side: (getattr(side, field), side.pick_count))
-        if not getattr(best, field):
+        best = max(player.score for player in scores)
+        return cls._player_award(
+            [player for player in scores if player.score == best], best
+        )
+
+    @classmethod
+    def _worst_scorers(cls, scores: list[PlayerScoreDto]) -> PlayerAwardDto | None:
+        # With one player, or with everyone level, there is no wooden spoon.
+        if len(scores) < 2:
             return None
-        return _notable(best)
+        worst = min(player.score for player in scores)
+        if worst == max(player.score for player in scores):
+            return None
+        return cls._player_award(
+            [player for player in scores if player.score == worst], worst
+        )
+
+    @classmethod
+    def _perfect_week(cls, scores: list[PlayerScoreDto]) -> PlayerAwardDto | None:
+        perfect = [
+            player
+            for player in scores
+            if player.failed_count == 0
+            and player.pushed_count == 0
+            and player.covered_count >= PERFECT_WEEK_PICKS
+        ]
+        return cls._player_award(perfect, perfect[0].score) if perfect else None
+
+    @classmethod
+    def _top_by_pick(
+        cls,
+        picks: list[dict],
+        by_game: dict[int, GameBreakdownDto],
+        points_for,
+    ) -> PlayerAwardDto | None:
+        """Most points earned from the picks `points_for` cares about. Nobody
+        wins if nobody scored any."""
+        totals: dict[str, float] = defaultdict(float)
+        for pick in picks:
+            game = by_game.get(pick["game_id"])
+            side = cls._side_of(game, pick) if game else None
+            if side:
+                totals[pick["username"]] += points_for(pick, side)
+
+        best = max(totals.values(), default=0.0)
+        if best <= 0:
+            return None
+        return PlayerAwardDto(
+            usernames=sorted(
+                username for username, total in totals.items() if total == best
+            ),
+            value=round(best, 2),
+        )
+
+    @classmethod
+    def _oracle(
+        cls,
+        picks: list[dict],
+        by_game: dict[int, GameBreakdownDto],
+        weight: dict[tuple[int, int], float],
+    ) -> PickAwardDto | None:
+        """The boldest contrarian call that came in: highest confidence first,
+        and among equals the one fewest people agreed with."""
+        best = None
+        for pick in picks:
+            if pick["pick_status"] != "COVERED":
+                continue
+            game = by_game.get(pick["game_id"])
+            side = cls._side_of(game, pick) if game else None
+            if not side or not cls._is_minority(game, side):
+                continue
+            rank = (pick["confidence"], -side.pick_share)
+            if best is None or rank > best[0]:
+                best = (rank, pick, game, side)
+
+        if best is None:
+            return None
+
+        _, pick, game, side = best
+        return PickAwardDto(
+            username=pick["username"],
+            game_id=game.game_id,
+            team=side.team,
+            opponent=side.opponent,
+            line=side.line,
+            confidence=pick["confidence"],
+            result=side.result,
+            points=float(pick["score"]),
+            pick_count=side.pick_count,
+            game_pick_count=game.pick_count,
+            pick_share=side.pick_share,
+        )
+
+    @staticmethod
+    def _side_award(
+        game: GameBreakdownDto,
+        side: SideBreakdownDto,
+        weight: dict[tuple[int, int], float],
+    ) -> SideAwardDto:
+        return SideAwardDto(
+            game_id=game.game_id,
+            team=side.team,
+            opponent=side.opponent,
+            line=side.line,
+            result=side.result,
+            margin=side.margin,
+            pick_count=side.pick_count,
+            game_pick_count=game.pick_count,
+            pick_share=side.pick_share,
+            confidence_total=weight.get((game.game_id, side.team.team_id), 0.0),
+        )
+
+    @classmethod
+    def _consensus_awards(cls, sides, weight) -> dict:
+        """
+        Where the league put its weight, and whether that was a mistake.
+
+        When the most-backed side lost, those are the same story and one card
+        tells it; a second card only appears when the heaviest side came in and
+        some other side took the money down with it.
+        """
+        backed = [(game, side) for game, side in sides if side.pick_count]
+        if not backed:
+            return {"most_confident": None, "consensus_miss": None}
+
+        def confidence(pair):
+            game, side = pair
+            return weight.get((game.game_id, side.team.team_id), 0.0)
+
+        top = max(backed, key=confidence)
+        most_confident = cls._side_award(*top, weight)
+
+        if most_confident.result != "COVERED":
+            return {"most_confident": most_confident, "consensus_miss": None}
+
+        missed = [pair for pair in backed if pair[1].result == "FAILED"]
+        if not missed:
+            return {"most_confident": most_confident, "consensus_miss": None}
+
+        return {
+            "most_confident": most_confident,
+            "consensus_miss": cls._side_award(*max(missed, key=confidence), weight),
+        }
+
+    @classmethod
+    def _sleeper(cls, sides, weight) -> SideAwardDto | None:
+        """The side that came in with the league looking the other way."""
+        overlooked = [
+            (game, side)
+            for game, side in sides
+            if side.pick_count
+            and side.result == "COVERED"
+            and cls._is_minority(game, side)
+        ]
+        if not overlooked:
+            return None
+        return cls._side_award(
+            *min(overlooked, key=lambda pair: pair[1].pick_share), weight
+        )
+
+    @staticmethod
+    def _split_decision(games: list[GameBreakdownDto]) -> GameAwardDto | None:
+        """The game the league could not agree on. Needs two people to disagree
+        in the first place."""
+        contested = [game for game in games if game.pick_count >= 2]
+        if not contested:
+            return None
+
+        game = min(
+            contested,
+            key=lambda g: (
+                abs(g.away.pick_count - g.home.pick_count),
+                -g.pick_count,
+            ),
+        )
+        return GameAwardDto(
+            game_id=game.game_id,
+            home_team=game.home_team,
+            away_team=game.away_team,
+            home_pick_count=game.home.pick_count,
+            away_pick_count=game.away.pick_count,
+        )
 
     @staticmethod
     def _confidence_breakdown(picks: list[dict]) -> list[ConfidenceBreakdownDto]:
@@ -272,142 +551,6 @@ class ResultsStatsService(BaseService):
                 )
             )
         return breakdown
-
-    @staticmethod
-    def _conviction(
-        picks: list[dict],
-    ) -> tuple[PlayerConvictionDto | None, PlayerConvictionDto | None]:
-        """
-        Who put their confidence on the picks that came in, and who spent it on
-        the ones that didn't.
-
-        Measured as points per correct pick: six points off three correct is a
-        2.0, five points off one correct is a 5.0. A player with nothing correct
-        has no ratio at all rather than a zero -- they had a bad week, which is
-        what `worst_score` is for.
-        """
-        totals: dict[str, float] = defaultdict(float)
-        hits: dict[str, int] = defaultdict(int)
-        scores: dict[str, float] = defaultdict(float)
-        for pick in picks:
-            scores[pick["username"]] += float(pick["score"])
-            if pick["pick_status"] == "COVERED":
-                totals[pick["username"]] += float(pick["confidence"])
-                hits[pick["username"]] += 1
-
-        ranked = sorted(
-            (
-                PlayerConvictionDto(
-                    username=username,
-                    score=round(scores[username], 2),
-                    covered_count=hits[username],
-                    points_per_hit=round(totals[username] / hits[username], 2),
-                )
-                for username in hits
-            ),
-            key=lambda player: (-player.points_per_hit, player.username),
-        )
-
-        # With fewer than two players on the board there is no comparison to
-        # draw, and the best and worst would be the same person. Identical
-        # ratios are the same problem one step along: naming a winner and a
-        # loser who scored the same thing says nothing about either.
-        if len(ranked) < 2 or ranked[0].points_per_hit == ranked[-1].points_per_hit:
-            return None, None
-        return ranked[0], ranked[-1]
-
-    @staticmethod
-    def _photo_finishes(picks: list[dict]) -> list[MarginPickDto]:
-        """
-        The picks that came down to nothing -- a hook, a late field goal. Both
-        directions: missing by half a point is the week's story, and surviving
-        by half a point is the same story from the other side.
-        """
-        close = [
-            pick
-            for pick in picks
-            if pick.get("margin") is not None
-            and pick["pick_status"] in GRADED_STATUSES
-            and abs(pick["margin"]) <= PHOTO_FINISH_MARGIN
-        ]
-        # Tightest first, and among equally tight ones the most confident --
-        # losing a 5-pointer by a hook stings more than losing a 1-pointer.
-        close.sort(key=lambda pick: (abs(pick["margin"]), -pick["confidence"]))
-
-        return [
-            MarginPickDto(
-                username=pick["username"],
-                game_id=pick["game_id"],
-                team=_team_dto(pick, "selected_team"),
-                opponent=_team_dto(
-                    pick,
-                    (
-                        "away_team"
-                        if pick["selected_team_id"] == pick["home_team_id"]
-                        else "home_team"
-                    ),
-                ),
-                line=float(pick["spread_value"]),
-                confidence=pick["confidence"],
-                result=pick["pick_status"],
-                margin=pick["margin"],
-                points=float(pick["score"]),
-            )
-            for pick in close[:MAX_PHOTO_FINISHES]
-        ]
-
-    @staticmethod
-    def _superlatives(
-        picks: list[dict],
-        games: list[GameBreakdownDto],
-        scores: list[PlayerScoreDto],
-    ) -> WeekSuperlativesDto:
-        # Best and worst are the same player in a one-player league, which is
-        # not a superlative worth showing.
-        best, worst = (scores[0], scores[-1]) if len(scores) > 1 else (None, None)
-
-        # A side exactly one player took, in a game more than one player picked.
-        solo_sides = {
-            (game.game_id, side.team.team_id)
-            for game in games
-            if game.pick_count > 1
-            for side in (game.home, game.away)
-            if side.pick_count == 1
-        }
-
-        solo_hits = [
-            SoloHitDto(
-                username=pick["username"],
-                game_id=pick["game_id"],
-                team=_team_dto(pick, "selected_team"),
-                opponent=_team_dto(
-                    pick,
-                    (
-                        "away_team"
-                        if pick["selected_team_id"] == pick["home_team_id"]
-                        else "home_team"
-                    ),
-                ),
-                line=float(pick["spread_value"]),
-                confidence=pick["confidence"],
-                points=float(pick["score"]),
-            )
-            for pick in picks
-            if pick["pick_status"] == "COVERED"
-            and (pick["game_id"], pick["selected_team_id"]) in solo_sides
-        ]
-        solo_hits.sort(key=lambda hit: (-hit.points, hit.username))
-
-        best_conviction, misplaced_conviction = ResultsStatsService._conviction(picks)
-
-        return WeekSuperlativesDto(
-            best_score=best,
-            worst_score=worst,
-            best_conviction=best_conviction,
-            misplaced_conviction=misplaced_conviction,
-            solo_hits=solo_hits,
-            photo_finishes=ResultsStatsService._photo_finishes(picks),
-        )
 
 
 def _side_breakdown(

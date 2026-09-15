@@ -85,36 +85,24 @@ class PlayerScoreDto(BaseDto):
     pushed_count: int = 0
 
 
-class SoloHitDto(BaseDto):
-    """A player who was the only one on a side, and was right."""
-
-    username: str
-    game_id: int
-    team: TeamDto
-    opponent: TeamDto
-    line: float
-    confidence: int
-    points: float
-
-
-class PlayerConvictionDto(BaseDto):
+class PlayerAwardDto(BaseDto):
     """
-    Where a player's confidence landed.
+    An award won by a player, or by several of them at once.
 
-    `points_per_hit` is the average confidence of the picks they got right. Six
-    points off three correct picks is a 2.0; five points off a single correct
-    pick is a 5.0 -- the same week's work, but the second player put their
-    weight on the one that came in.
+    `usernames` is a list because ties are frequent at this league size -- five
+    picks each means scores land on the same handful of values -- and picking
+    one of them arbitrarily would be a lie about the week.
     """
 
-    username: str
-    score: float
-    covered_count: int
-    points_per_hit: float
+    usernames: List[str]
+    value: float
+    covered_count: int = 0
+    failed_count: int = 0
+    pushed_count: int = 0
 
 
-class MarginPickDto(BaseDto):
-    """A pick decided by almost nothing, either way."""
+class PickAwardDto(BaseDto):
+    """An award won by one player's single pick."""
 
     username: str
     game_id: int
@@ -123,17 +111,62 @@ class MarginPickDto(BaseDto):
     line: float
     confidence: int
     result: PickOutcome
-    margin: float
     points: float
+    pick_count: int
+    game_pick_count: int
+    pick_share: float
 
 
-class WeekSuperlativesDto(BaseDto):
-    best_score: PlayerScoreDto | None = None
-    worst_score: PlayerScoreDto | None = None
-    best_conviction: PlayerConvictionDto | None = None
-    misplaced_conviction: PlayerConvictionDto | None = None
-    solo_hits: List[SoloHitDto] = Field(default_factory=list)
-    photo_finishes: List[MarginPickDto] = Field(default_factory=list)
+class SideAwardDto(BaseDto):
+    """An award won by one side of one game, league-wide."""
+
+    game_id: int
+    team: TeamDto
+    opponent: TeamDto
+    line: float
+    result: PickOutcome
+    margin: float
+    pick_count: int
+    game_pick_count: int
+    pick_share: float
+    confidence_total: float
+
+
+class GameAwardDto(BaseDto):
+    """An award won by a whole game rather than a side of it."""
+
+    game_id: int
+    home_team: TeamDto
+    away_team: TeamDto
+    home_pick_count: int
+    away_pick_count: int
+
+
+class WeekAwardsDto(BaseDto):
+    """
+    The week's stories, not a second statistics table.
+
+    Every award is optional and is left out when the week produced nothing
+    worth saying -- nobody went perfect, no contrarian pick came in. Forcing a
+    winner into every slot every week is how a section like this stops being
+    read.
+    """
+
+    # Players
+    player_of_the_week: PlayerAwardDto | None = None
+    perfect_week: PlayerAwardDto | None = None
+    ice_cold: PlayerAwardDto | None = None
+    value_hunter: PlayerAwardDto | None = None
+    dog_lover: PlayerAwardDto | None = None
+    oracle: PickAwardDto | None = None
+
+    # Games and the league
+    most_confident: SideAwardDto | None = None
+    consensus_miss: SideAwardDto | None = None
+    sleeper: SideAwardDto | None = None
+    biggest_cover: SideAwardDto | None = None
+    photo_finish: SideAwardDto | None = None
+    split_decision: GameAwardDto | None = None
 
 
 class WeekStatsDto(BaseDto):
@@ -155,10 +188,7 @@ class WeekStatsDto(BaseDto):
     average_score: float | None = None
     median_score: float | None = None
     hit_rate: float | None = None
-    most_popular_pick: NotablePickDto | None = None
-    most_correct_pick: NotablePickDto | None = None
-    most_missed_pick: NotablePickDto | None = None
     unanimous_picks: List[NotablePickDto] = Field(default_factory=list)
     confidence_breakdown: List[ConfidenceBreakdownDto] = Field(default_factory=list)
     games: List[GameBreakdownDto] = Field(default_factory=list)
-    superlatives: WeekSuperlativesDto = Field(default_factory=WeekSuperlativesDto)
+    awards: WeekAwardsDto = Field(default_factory=WeekAwardsDto)
