@@ -113,6 +113,10 @@ class WeekModel(BaseModel):
     week_number = IntegerField()
     start_date = DateField(null=True)
     end_date = DateField(null=True)
+    # Set once every game in the week has a final score, and overridable by an
+    # admin. Gates the end-of-week statistics: a half-finished week would show
+    # a "most missed pick" that the Monday night game is about to overturn.
+    completed = BooleanField(default=False)
 
     class Meta:
         table_name = "week"

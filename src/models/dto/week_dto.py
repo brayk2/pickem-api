@@ -16,5 +16,8 @@ class WeekDto(BaseModel):
     id: int
     season: SeasonDto
     week_number: int
-    start_date: datetime.datetime
-    end_date: datetime.datetime
+    # The scraper creates weeks without dates, so these are absent far more
+    # often than not; requiring them made /admin/weeks fail on real rows.
+    start_date: datetime.datetime | None = None
+    end_date: datetime.datetime | None = None
+    completed: bool = False

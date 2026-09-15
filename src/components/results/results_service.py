@@ -33,6 +33,49 @@ _game_result = GameResultModel.alias()
 _season = SeasonModel.alias()
 _week_model = WeekModel.alias()
 
+# A covered pick is worth its confidence, a push half, a miss nothing.
+PICK_MULTIPLIERS = {"COVERED": 1.0, "PUSHED": 0.5, "FAILED": 0.0}
+
+
+def pick_margin(pick: dict) -> float | None:
+    """
+    Points by which the pick beat its line; negative means it fell short.
+
+    Each pick stores the line the player took it at, so this is the selected
+    team's final score plus that line, against its opponent's. A pick whose team
+    is in neither slot of the game is a data fault rather than a result, and has
+    no margin at all.
+    """
+    if pick["selected_team_id"] == pick["home_team_id"]:
+        adjusted = pick["home_team_score"] + pick["spread_value"]
+        opponent_score = pick["away_team_score"]
+    elif pick["selected_team_id"] == pick["away_team_id"]:
+        adjusted = pick["away_team_score"] + pick["spread_value"]
+        opponent_score = pick["home_team_score"]
+    else:
+        return None
+
+    return float(adjusted - opponent_score)
+
+
+def grade_pick(pick: dict) -> str:
+    """
+    Whether a pick beat its line -- the sign of its margin. An ungradeable pick
+    scores nothing rather than silently counting as a miss.
+    """
+    margin = pick_margin(pick)
+    if margin is None:
+        return "UNKNOWN"
+    if margin > 0:
+        return "COVERED"
+    if margin < 0:
+        return "FAILED"
+    return "PUSHED"
+
+
+def score_pick(pick_status: str, confidence: int) -> float:
+    return (confidence or 0) * PICK_MULTIPLIERS.get(pick_status, 0.0)
+
 
 @dependency
 class ResultsService(BaseService):
@@ -41,17 +84,22 @@ class ResultsService(BaseService):
         super().__init__()
         self.league_service = league_service
 
-    async def _get_pick_results(
+    def get_graded_picks(
         self, year: int, week_condition, league_id: int, user: str = None
-    ) -> list[UserPickResultsDto]:
+    ) -> list[dict]:
         """
-        get list of all picks filtered by league, user and week
+        Every graded pick for a league-season, as flat rows with `pick_status`
+        and `score` attached.
+
+        This is the single source of grading. The leaderboard groups these rows
+        by player; the week statistics group the same rows by game. Grading them
+        twice in two places is how the two views drift apart.
 
         :param year:
-        :param week_condition:
+        :param week_condition: a peewee expression over the week, so callers can
+            ask for one week or every week up to one
         :param league_id: the league whose picks to return
-        :param user:
-        :return:
+        :param user: restrict to a single player
         """
         league_season = self.league_service.get_league_season(
             league_id=league_id, year=year
@@ -64,21 +112,25 @@ class ResultsService(BaseService):
                 _pick.spread_value,
                 _pick.confidence,
                 _pick.status,
+                _week_model.week_number,
                 _team.id.alias("selected_team_id"),
                 _team.name.alias("selected_team_name"),
                 _team.city.alias("selected_team_city"),
+                _team.abbreviation.alias("selected_team_abbreviation"),
                 _team.thumbnail.alias("selected_team_thumbnail"),
                 _team.primary_color.alias("selected_team_primary_color"),
                 _team.secondary_color.alias("selected_team_secondary_color"),
                 _home_team.id.alias("home_team_id"),
                 _home_team.name.alias("home_team_name"),
                 _home_team.city.alias("home_team_city"),
+                _home_team.abbreviation.alias("home_team_abbreviation"),
                 _home_team.thumbnail.alias("home_team_thumbnail"),
                 _home_team.primary_color.alias("home_team_primary_color"),
                 _home_team.secondary_color.alias("home_team_secondary_color"),
                 _away_team.id.alias("away_team_id"),
                 _away_team.name.alias("away_team_name"),
                 _away_team.city.alias("away_team_city"),
+                _away_team.abbreviation.alias("away_team_abbreviation"),
                 _away_team.thumbnail.alias("away_team_thumbnail"),
                 _away_team.primary_color.alias("away_team_primary_color"),
                 _away_team.secondary_color.alias("away_team_secondary_color"),
@@ -106,53 +158,36 @@ class ResultsService(BaseService):
             query = query.where(_user.username == user)
 
         self.logger.info(f"Query generated: {query.sql()}")
-        picks = query.dicts()
-        self.logger.info(f"Number of picks returned: {len(list(picks))}")
+        picks = list(query.dicts())
+        self.logger.info(f"Number of picks returned: {len(picks)}")
+
+        for pick in picks:
+            pick["margin"] = pick_margin(pick)
+            pick["pick_status"] = grade_pick(pick)
+            pick["score"] = score_pick(pick["pick_status"], pick.get("confidence", 0))
+
+        return picks
+
+    async def _get_pick_results(
+        self, year: int, week_condition, league_id: int, user: str = None
+    ) -> list[UserPickResultsDto]:
+        """
+        get list of all picks filtered by league, user and week, grouped by
+        player and ranked
+
+        :param year:
+        :param week_condition:
+        :param league_id: the league whose picks to return
+        :param user:
+        :return:
+        """
+        picks = self.get_graded_picks(
+            year=year, week_condition=week_condition, league_id=league_id, user=user
+        )
 
         user_results = {}
         for pick in picks:
             self.logger.debug(f"Processing pick: {pick}")
-            pick_status = ""
-
-            try:
-                if (
-                    pick["selected_team_id"] == pick["home_team_id"]
-                    and (pick["home_team_score"] + pick["spread_value"])
-                    > pick["away_team_score"]
-                ) or (
-                    pick["selected_team_id"] == pick["away_team_id"]
-                    and (pick["away_team_score"] + pick["spread_value"])
-                    > pick["home_team_score"]
-                ):
-                    pick_status = "COVERED"
-                elif (
-                    pick["selected_team_id"] == pick["home_team_id"]
-                    and (pick["home_team_score"] + pick["spread_value"])
-                    < pick["away_team_score"]
-                ) or (
-                    pick["selected_team_id"] == pick["away_team_id"]
-                    and (pick["away_team_score"] + pick["spread_value"])
-                    < pick["home_team_score"]
-                ):
-                    pick_status = "FAILED"
-                elif (
-                    pick["selected_team_id"] == pick["home_team_id"]
-                    and (pick["home_team_score"] + pick["spread_value"])
-                    == pick["away_team_score"]
-                ) or (
-                    pick["selected_team_id"] == pick["away_team_id"]
-                    and (pick["away_team_score"] + pick["spread_value"])
-                    == pick["home_team_score"]
-                ):
-                    pick_status = "PUSHED"
-            except Exception as e:
-                self.logger.exception(e)
-                raise e
-
-            multiplier = (
-                1 if pick_status == "COVERED" else 0.5 if pick_status == "PUSHED" else 0
-            )
-            score = pick.get("confidence", 0) * multiplier
 
             if pick["username"] not in user_results:
                 user_results[pick["username"]] = {
@@ -169,6 +204,7 @@ class ResultsService(BaseService):
                         team_id=pick["selected_team_id"],
                         team_name=pick["selected_team_name"],
                         team_city=pick["selected_team_city"],
+                        abbreviation=pick["selected_team_abbreviation"],
                         thumbnail=pick["selected_team_thumbnail"],
                         primary_color=pick["selected_team_primary_color"],
                         secondary_color=pick["selected_team_secondary_color"],
@@ -176,11 +212,11 @@ class ResultsService(BaseService):
                     confidence=pick["confidence"],
                     spread_value=pick["spread_value"],
                     status=pick["status"],
-                    score=score,
-                    pick_status=pick_status,
+                    score=pick["score"],
+                    pick_status=pick["pick_status"],
                 )
             )
-            user_results[pick["username"]]["total_score"] += score
+            user_results[pick["username"]]["total_score"] += pick["score"]
 
         self.logger.info(f"Processed results for users: {list(user_results.keys())}")
         sorted_results = sorted(
@@ -190,6 +226,17 @@ class ResultsService(BaseService):
             result["rank"] = rank
 
         return [UserPickResultsDto(**result) for result in sorted_results]
+
+    def get_graded_picks_for_week(
+        self, year: int, week: int, league_id: int
+    ) -> list[dict]:
+        """Graded picks for a single week -- the raw rows the week stats
+        aggregate by game."""
+        return self.get_graded_picks(
+            year=year,
+            week_condition=(_week_model.week_number == week),
+            league_id=league_id,
+        )
 
     async def get_user_pick_results(
         self, year: int, week: int, league_id: int, user: str = None

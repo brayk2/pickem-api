@@ -9,6 +9,7 @@ from src.models.db_models import (
     TeamModel,
     GameResultModel,
 )
+from src.components.week.week_service import WeekService
 from src.services.scrapers.base_scraper import BaseScraper
 
 
@@ -216,7 +217,13 @@ class EspnScraper(BaseScraper):
 
     def scrape_season(self, year: int):
         season = self._scrape_season(year=year)
-        return self._save_schedule(year=year, season=season)
+        saved = self._save_schedule(year=year, season=season)
+
+        # Loading results is what finishes a week, so reconcile the completion
+        # flag here rather than on a separate schedule -- otherwise the last
+        # game's score and the week's stats would appear at different times.
+        WeekService().sync_season_completion(year=year)
+        return saved
 
 
 if __name__ == "__main__":
