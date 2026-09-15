@@ -11,7 +11,9 @@ class TeamDto(BaseDto):
     team_name: str
     team_city: str
     abbreviation: str | None = None
-    thumbnail: str
+    # Nullable in the database -- a team scraped before the thumbnail pass has
+    # none, and requiring it here turned that into a 500 on the results page.
+    thumbnail: str | None = None
     primary_color: str | None = None
     secondary_color: str | None = None
 

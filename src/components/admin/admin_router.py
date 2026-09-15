@@ -11,6 +11,11 @@ from src.config.logger import Logger
 from src.models.dto.action_dto import CreateActionRequest
 from src.models.dto.admin_dtos import ApiQuota
 from src.models.dto.group_dto import CreateGroupRequest, CreateGroupResponse
+from src.components.week.week_models import (
+    SetWeekCompletionRequest,
+    WeekCompletionDto,
+)
+from src.components.week.week_service import WeekService
 from src.models.db_models import GameModel, SpreadModel, GroupModel
 
 admin_router = APIRouter(
@@ -46,6 +51,28 @@ async def get_week_information(
     season: int, admin_service: AdminService = Depends(AdminService.create)
 ):
     return admin_service.get_week_information(season=season)
+
+
+@admin_router.put("/weeks/{year}/{week}/completion", response_model=WeekCompletionDto)
+async def set_week_completion(
+    year: int,
+    week: int,
+    request: SetWeekCompletionRequest,
+    token: DecodedToken = Depends(PermissionChecker.admin),
+    week_service: WeekService = Depends(WeekService.create),
+):
+    """
+    Force a week open or closed.
+
+    The scraper completes a week on its own once every game has a final score,
+    so this is for the exceptions: holding a week back while a bad score is
+    corrected, or releasing one whose last game will never be played. A week
+    set here is left alone by the scraper from then on.
+    """
+    completed = week_service.set_completion(
+        year=year, week=week, completed=request.completed, actor=token.sub
+    )
+    return WeekCompletionDto(year=year, week=week, completed=completed)
 
 
 @admin_router.get("/actions")

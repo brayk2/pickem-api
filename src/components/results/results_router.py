@@ -12,6 +12,8 @@ from src.components.results.results_dto import (
     WeekResultsDto,
 )
 from src.components.results.results_service import ResultsService
+from src.components.results.results_stats_dto import WeekStatsDto
+from src.components.results.results_stats_service import ResultsStatsService
 from src.config.logger import Logger
 from src.services.spread_service import SpreadService
 
@@ -70,6 +72,27 @@ async def get_league_pick_results(
         year, week, league_id=league_id
     )
     return await results_service.get_league_results(user_results)
+
+
+@results_router.get("/{league_id}/{year}/{week}/stats", response_model=WeekStatsDto)
+async def get_week_stats(
+    league_id: int,
+    year: int,
+    week: int,
+    stats_service: ResultsStatsService = Depends(ResultsStatsService.create),
+    _: DecodedToken = Depends(LeaguePermission.league_member),
+    logger: Logger = Depends(Logger),
+):
+    """
+    End-of-week statistics for the league: how it split on each game, which
+    picks it got right and wrong, and how each confidence level paid.
+
+    Returns `completed: false` and nothing else until the week is finished, so
+    the page can hold the panel back rather than showing numbers that will
+    change once the last game is scored.
+    """
+    logger.info(f"Getting week stats for league {league_id}, {year} week {week}")
+    return await stats_service.get_week_stats(year=year, week=week, league_id=league_id)
 
 
 @results_router.get("/{year}/{week}/nfl-games", response_model=list[MatchupDto])
