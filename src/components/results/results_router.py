@@ -97,11 +97,20 @@ async def get_league_pick_results(
     token: DecodedToken = Depends(LeaguePermission.league_member),
     logger: Logger = Depends(Logger),
 ):
+    """
+    The week's table, with a row for every player on the season's roster.
+
+    A selection never appears here before its game has been graded -- the query
+    behind `picks` joins on a final score, so an ungraded pick has no row to
+    come from. What does appear, once the week has opened, is the confidence
+    levels each player has staked: `submittedConfidences`, numbers only. Enough
+    to see that somebody has their 5 and their 3 in, or that somebody has
+    nothing in; never enough to see what they took.
+    """
     logger.info(f"Getting league pick results for year {year} and week {week}")
-    user_results = await results_service.get_user_pick_results(
+    return await results_service.get_league_week_results(
         year, week, league_id=league_id
     )
-    return await results_service.get_league_results(user_results)
 
 
 @results_router.get("/{league_id}/{year}/{week}/stats", response_model=WeekStatsDto)

@@ -1,5 +1,7 @@
 import asyncio
 
+from peewee import JOIN
+
 from src.components.results.results_models import (
     UserPickResultsDto,
     WeekResultsDto,
@@ -21,6 +23,11 @@ from src.models.db_models import (
     WeekModel,
 )
 from src.components.league.league_service import LeagueService
+from src.components.season.season_exceptions import (
+    WeekNotSetException,
+    YearNotSetException,
+)
+from src.components.season.season_service import SeasonService
 from src.util.injection import dependency, inject
 
 _user = UserModel.alias()
@@ -80,9 +87,10 @@ def score_pick(pick_status: str, confidence: int) -> float:
 @dependency
 class ResultsService(BaseService):
     @inject
-    def __init__(self, league_service: LeagueService):
+    def __init__(self, league_service: LeagueService, season_service: SeasonService):
         super().__init__()
         self.league_service = league_service
+        self.season_service = season_service
 
     def _graded_picks_query(self, conditions: list):
         """
@@ -218,6 +226,88 @@ class ResultsService(BaseService):
             )
         )
 
+    def week_is_open(self, year: int, week: int) -> bool:
+        """
+        Whether a week has opened, and so whether who-has-submitted may be told.
+
+        The week flips on the Thursday 6am rollover that pulls the lines, which
+        is also when the pick window opens, so this is `week <= current_week` in
+        the current season rather than anything to do with kickoff. Nudging
+        somebody who has not picked is only useful before the deadline, and a
+        confidence level on its own gives away nothing about a selection.
+
+        A missing current week or year means the season has not been set up.
+        That is not a reason to fail a results page, so it reads as not open --
+        the conservative direction, since it withholds rather than reveals.
+        """
+        try:
+            current = self.season_service.get_current_week_and_year()
+        except (WeekNotSetException, YearNotSetException):
+            self.logger.warning("Current week/year unset; treating week as unopened")
+            return False
+
+        if int(current["year"]) != int(year):
+            # A past season is entirely open; a future one entirely closed.
+            return int(year) < int(current["year"])
+
+        return int(week) <= int(current["week"])
+
+    def get_submitted_confidences(
+        self, year: int, week: int, league_id: int
+    ) -> dict[str, list[int]]:
+        """
+        Which confidence levels each player has staked but not yet had graded,
+        as {username: [5, 3]}.
+
+        This is what lets the results page say "Johnny has his 5 and his 3 in"
+        while the picks themselves stay hidden, and why it is a separate query
+        rather than a filter over the graded rows: it selects the username and
+        the confidence and *nothing else*. There is no team, line or score in
+        the result set to leak, so no later edit to this file can widen it into
+        one by accident. The response DTO has nowhere to put a team either.
+
+        The predicate is the exact complement of the graded query's -- a pick
+        whose game has no result row, or has one with a missing score -- so
+        every submitted pick is either graded or pending, never both and never
+        neither.
+        """
+        if not self.week_is_open(year=year, week=week):
+            return {}
+
+        league_season = self.league_service.get_league_season(
+            league_id=league_id, year=year
+        )
+
+        query = (
+            _pick.select(_user.username, _pick.confidence)
+            .join(_user, on=(_pick.user == _user.id))
+            .join(_game, on=(_pick.game == _game.id))
+            .join(_season, on=(_game.season == _season.id))
+            .join(_week_model, on=(_game.week == _week_model.id))
+            # LEFT OUTER because the rows wanted here are the ones the graded
+            # query's inner join throws away: games with no result at all.
+            .join(_game_result, JOIN.LEFT_OUTER, on=(_game_result.game == _game.id))
+            .where(
+                _season.year == year,
+                _week_model.week_number == week,
+                _pick.league_season == league_season.id,
+                (
+                    _game_result.id.is_null()
+                    | _game_result.home_score.is_null()
+                    | _game_result.away_score.is_null()
+                ),
+            )
+            .order_by(_pick.confidence.desc())
+        )
+
+        self.logger.info(f"Pending-confidence query: {query.sql()}")
+
+        pending: dict[str, list[int]] = {}
+        for row in query.dicts():
+            pending.setdefault(row["username"], []).append(row["confidence"])
+
+        return pending
+
     async def _get_pick_results(
         self, year: int, week_condition, league_id: int, user: str = None
     ) -> list[UserPickResultsDto]:
@@ -345,10 +435,60 @@ class ResultsService(BaseService):
         )
         return WeekResultsDto(week=week, results=results)
 
-    async def get_league_results(
-        self, user_results: list[UserPickResultsDto]
+    async def get_league_week_results(
+        self, year: int, week: int, league_id: int
     ) -> list[UserPickResultsDto]:
-        return user_results
+        """
+        The week's table with every player on it, whether they picked or not.
+
+        Previously this was built from the graded picks alone, which meant a
+        player with nothing graded was not in the answer at all -- so the page
+        could not count the league, and "has not submitted" and "submitted,
+        still playing" looked the same: an absent row either way.
+
+        Everyone on the season's roster gets a row now. Three states fall out
+        per confidence slot: graded picks arrive in `picks` with a status,
+        staked-but-ungraded ones as numbers in `submitted_confidences`, and a
+        slot in neither was never filled.
+        """
+        results = await self.get_user_pick_results(year, week, league_id=league_id)
+        scored = {result.username: result for result in results}
+
+        submitted = self.get_submitted_confidences(
+            year=year, week=week, league_id=league_id
+        )
+        league_season = self.league_service.get_league_season(
+            league_id=league_id, year=year
+        )
+        members = self.league_service.list_members(league_season=league_season)
+
+        # Roster first, then anyone who has a pick but has since left it: a
+        # season that was played happened, whoever is on the roster now.
+        usernames = {member.username for member in members}
+        usernames.update(scored)
+        usernames.update(submitted)
+
+        rows = [
+            UserPickResultsDto(
+                username=username,
+                picks=scored[username].picks if username in scored else [],
+                total_score=(
+                    scored[username].total_score if username in scored else 0.0
+                ),
+                submitted_confidences=submitted.get(username, []),
+            )
+            for username in sorted(usernames)
+        ]
+
+        # Sorted by name above and by score here, and Python's sort is stable,
+        # so players on the same score come out alphabetically rather than in
+        # whatever order the set iterated. Ranking is otherwise untouched --
+        # still positional, ties still not shared.
+        rows.sort(key=lambda row: row.total_score, reverse=True)
+        for position, row in enumerate(rows, start=1):
+            row.rank = position
+
+        return rows
 
     async def get_nfl_game_results(
         self, year: int, week: int, page: int, page_size: int
