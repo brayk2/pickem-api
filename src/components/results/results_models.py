@@ -95,6 +95,14 @@ class UserPickResultsDto(BaseDto):
     picks: List[PickDto]
     total_score: float = Field(default=0.0)
     rank: int | None = Field(default=None)
+    # Confidence levels this player has staked on games that have not been
+    # graded yet -- numbers only, deliberately. It is what distinguishes a slot
+    # nobody filled from one that is filled and waiting, without saying what is
+    # in it. There is no field here for a team on purpose: an ungraded pick's
+    # selection has nowhere to go even if some future caller tried to put it
+    # somewhere. Empty until the week opens; see
+    # ResultsService.get_submitted_confidences.
+    submitted_confidences: List[int] = Field(default_factory=list)
 
 
 class LeaguePickResultsDto(BaseDto):
