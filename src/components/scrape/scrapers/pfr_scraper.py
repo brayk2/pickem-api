@@ -1,7 +1,7 @@
 from playhouse.shortcuts import model_to_dict
 
 from src.models.db_models import TeamModel, SeasonModel
-from src.services.scrapers.base_scraper import BaseScraper
+from src.components.scrape.scrapers.base_scraper import BaseScraper
 
 
 class PfrScraper(BaseScraper):

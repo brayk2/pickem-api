@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field, TypeAdapter
 
 from src.components.admin.admin_service import AdminService
 from src.config.base_service import BaseService
-from src.services.property_service import PropertyService
-from src.services.secret_service import SecretService
+from src.components.property.property_service import PropertyService
+from src.integrations.secret_service import SecretService
 from src.util.injection import dependency, inject
 
 

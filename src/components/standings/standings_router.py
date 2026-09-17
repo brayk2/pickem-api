@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path
-from src.components.auth.auth_models import DecodedToken
+from src.security.security_models import DecodedToken
 from src.components.league.league_permission import LeaguePermission
-from src.components.standings.standings_dtos import StandingsHistoryDto, StandingsDto
+from src.components.standings.standings_models import StandingsHistoryDto, StandingsDto
 from src.components.standings.standings_service import StandingsService
 
 

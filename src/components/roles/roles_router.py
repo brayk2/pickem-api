@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status
 
-from src.components.auth.permission_checker import PermissionChecker
+from src.security.permission_checker import PermissionChecker
 from src.components.roles.roles_models import RoleCreateDto, RoleDto, AddUserToRoleDto
 from src.components.roles.roles_service import RolesService
 from src.components.user.user_service import UserService

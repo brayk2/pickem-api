@@ -1,7 +1,7 @@
 from src.components.season.season_service import SeasonService
 from src.config.logger import Logger
 from src.lambdas.utils import connect_db
-from src.services.scrapers.espn_scraper import EspnScraper
+from src.components.scrape.scrapers.espn_scraper import EspnScraper
 
 logger = Logger()
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 
-from src.components.auth.auth_models import DecodedToken
-from src.components.auth.permission_checker import PermissionChecker
+from src.security.security_models import DecodedToken
+from src.security.permission_checker import PermissionChecker
 from src.components.email.email_service import EmailService
 from src.components.user.password_generator import gen_pass
 from src.components.user.user_models import (
@@ -12,7 +12,7 @@ from src.components.user.user_models import (
     UpdateUserRequest,
 )
 from src.components.user.user_service import UserService
-from src.services.oauth_service import OAuthService
+from src.security.oauth_service import OAuthService
 
 user_router = APIRouter(
     prefix="/user", tags=["User"], dependencies=[Depends(PermissionChecker.authenticated)]

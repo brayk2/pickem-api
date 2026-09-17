@@ -1,4 +1,4 @@
-from src.services.property_service import PropertyService
+from src.components.property.property_service import PropertyService
 from src.util.injection import dependency, inject
 from src.components.season.season_exceptions import (
     WeekNotSetException,

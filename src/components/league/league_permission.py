@@ -1,7 +1,7 @@
 from fastapi import Depends
 
-from src.components.auth.auth_models import DecodedToken
-from src.components.auth.permission_checker import PermissionChecker
+from src.security.security_models import DecodedToken
+from src.security.permission_checker import PermissionChecker
 from src.components.league.league_exceptions import (
     NotALeagueCommissionerException,
     NotALeagueMemberException,

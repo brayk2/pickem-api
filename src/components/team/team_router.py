@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Response
-from src.services.spread_service import SpreadService
+from src.components.spread.spread_service import SpreadService
 import imageio.v2 as iio
 
 spread_service = SpreadService()

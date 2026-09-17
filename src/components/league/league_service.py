@@ -1,6 +1,6 @@
 from peewee import DoesNotExist, IntegrityError
 
-from src.components.auth.auth_models import LeagueClaim
+from src.security.security_models import LeagueClaim
 from src.components.league.league_exceptions import (
     DuplicateLeagueException,
     DuplicateLeagueMemberException,
@@ -171,6 +171,41 @@ class LeagueService(BaseService):
                 .order_by(UserModel.username)
             )
         ]
+
+    def list_members_by_season(
+        self, league_season_ids: list[int]
+    ) -> dict[int, list[LeagueMemberDto]]:
+        """
+        Rosters for several league-seasons at once, keyed by league-season id.
+
+        The league history seeds each season's standings from that season's
+        roster. Asking for them one at a time is a query per year, which grows
+        for as long as the league keeps running.
+        """
+        if not league_season_ids:
+            return {}
+
+        rosters: dict[int, list[LeagueMemberDto]] = {
+            season_id: [] for season_id in league_season_ids
+        }
+
+        for member in (
+            LeagueMemberModel.select(LeagueMemberModel, UserModel)
+            .join(UserModel, on=(LeagueMemberModel.user == UserModel.id))
+            .where(LeagueMemberModel.league_season.in_(list(league_season_ids)))
+            .order_by(UserModel.username)
+        ):
+            rosters[member.league_season_id].append(
+                LeagueMemberDto(
+                    user_id=member.user.id,
+                    username=member.user.username,
+                    first_name=member.user.first_name,
+                    last_name=member.user.last_name,
+                    role=member.role,
+                )
+            )
+
+        return rosters
 
     def add_member(
         self,

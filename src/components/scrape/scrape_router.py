@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from src.components.auth.permission_checker import PermissionChecker
+from src.security.permission_checker import PermissionChecker
 
-from src.services.scrapers.espn_scraper import EspnScraper
-from src.services.scrapers.nfl_scraper import NflScraper
-from src.services.scrapers.pfr_scraper import PfrScraper
+from src.components.scrape.scrapers.espn_scraper import EspnScraper
+from src.components.scrape.scrapers.nfl_scraper import NflScraper
+from src.components.scrape.scrapers.pfr_scraper import PfrScraper
 
 pfr_scraper = PfrScraper()
 espn_scraper = EspnScraper()

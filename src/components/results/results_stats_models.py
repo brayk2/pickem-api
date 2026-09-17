@@ -2,7 +2,7 @@ from typing import Literal, List
 
 from pydantic import Field
 
-from src.components.results.results_dto import TeamDto
+from src.components.results.results_models import TeamDto
 from src.models.base_models import BaseDto
 
 # A side's outcome is normally one of the three grades. MIXED covers the case

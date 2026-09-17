@@ -1,6 +1,6 @@
 import asyncio
 
-from src.components.results.results_dto import (
+from src.components.results.results_models import (
     UserPickResultsDto,
     WeekResultsDto,
     GameResultDto,
@@ -84,27 +84,16 @@ class ResultsService(BaseService):
         super().__init__()
         self.league_service = league_service
 
-    def get_graded_picks(
-        self, year: int, week_condition, league_id: int, user: str = None
-    ) -> list[dict]:
+    def _graded_picks_query(self, conditions: list):
         """
-        Every graded pick for a league-season, as flat rows with `pick_status`
-        and `score` attached.
+        The pick-and-result join that every graded-pick reader runs.
 
-        This is the single source of grading. The leaderboard groups these rows
-        by player; the week statistics group the same rows by game. Grading them
-        twice in two places is how the two views drift apart.
-
-        :param year:
-        :param week_condition: a peewee expression over the week, so callers can
-            ask for one week or every week up to one
-        :param league_id: the league whose picks to return
-        :param user: restrict to a single player
+        Kept in one place because the columns are the contract: the leaderboard
+        groups these rows by player, the week statistics group the same rows by
+        game, and the league history groups them by season. What varies between
+        those is the filter, so only the filter is a parameter.
         """
-        league_season = self.league_service.get_league_season(
-            league_id=league_id, year=year
-        )
-        query = (
+        return (
             _pick.select(
                 _pick.id,
                 _user.username,
@@ -136,6 +125,9 @@ class ResultsService(BaseService):
                 _away_team.secondary_color.alias("away_team_secondary_color"),
                 _game_result.home_score.alias("home_team_score"),
                 _game_result.away_score.alias("away_team_score"),
+                # Constant within a season, and the grouping key when a caller
+                # asks for several at once.
+                _season.year.alias("year"),
             )
             .join(_user, on=(_pick.user == _user.id))
             .join(_game, on=(_pick.game == _game.id))
@@ -145,18 +137,16 @@ class ResultsService(BaseService):
             .join(_game_result, on=(_game_result.game == _game.id))
             .join(_season, on=(_game.season == _season.id))
             .join(_week_model, on=(_game.week == _week_model.id))
-            .where(
-                _season.year == year,
-                _pick.league_season == league_season.id,
-                week_condition,
-                _game_result.home_score.is_null(False),  # Ensure the game has concluded
-                _game_result.away_score.is_null(False),  # Ensure the game has concluded
-            )
+            .where(*conditions)
+            # Ordered so a season's picks arrive as a season reads. Nothing
+            # downstream depended on the previous order -- the results page
+            # looks picks up by confidence -- but a flat list of ninety picks
+            # in whatever order the planner chose is not something to hand out.
+            .order_by(_season.year, _week_model.week_number, _pick.confidence.desc())
         )
 
-        if user:
-            query = query.where(_user.username == user)
-
+    def _grade(self, query) -> list[dict]:
+        """Run a graded-picks query and attach margin, status and score."""
         self.logger.info(f"Query generated: {query.sql()}")
         picks = list(query.dicts())
         self.logger.info(f"Number of picks returned: {len(picks)}")
@@ -167,6 +157,66 @@ class ResultsService(BaseService):
             pick["score"] = score_pick(pick["pick_status"], pick.get("confidence", 0))
 
         return picks
+
+    def get_graded_picks(
+        self, year: int, league_id: int, week_condition=None, user: str = None
+    ) -> list[dict]:
+        """
+        Every graded pick for a league-season, as flat rows with `pick_status`
+        and `score` attached.
+
+        This is the single source of grading. Grading the same picks twice in
+        two places is how two views of them drift apart.
+
+        Only concluded games are returned -- the join requires both scores -- so
+        an unbounded week means "everything played so far" without the caller
+        having to know which week that is.
+
+        :param year:
+        :param league_id: the league whose picks to return
+        :param week_condition: a peewee expression over the week, so callers can
+            ask for one week or every week up to one. `None` asks for the whole
+            season.
+        :param user: restrict to a single player
+        """
+        league_season = self.league_service.get_league_season(
+            league_id=league_id, year=year
+        )
+
+        conditions = [
+            _season.year == year,
+            _pick.league_season == league_season.id,
+            _game_result.home_score.is_null(False),  # Ensure the game has concluded
+            _game_result.away_score.is_null(False),  # Ensure the game has concluded
+        ]
+        if week_condition is not None:
+            conditions.append(week_condition)
+        if user:
+            conditions.append(_user.username == user)
+
+        return self._grade(self._graded_picks_query(conditions))
+
+    def get_graded_picks_for_seasons(self, league_season_ids: list[int]) -> list[dict]:
+        """
+        Every graded pick across several of a league's seasons, in one query.
+
+        The league history needs each season's standings at once. Asking per
+        season meant a query -- and a Lambda invocation -- per year, growing by
+        one every season the league survives. Rows carry their `year`, so the
+        caller groups what comes back rather than asking again.
+        """
+        if not league_season_ids:
+            return []
+
+        return self._grade(
+            self._graded_picks_query(
+                [
+                    _pick.league_season.in_(list(league_season_ids)),
+                    _game_result.home_score.is_null(False),
+                    _game_result.away_score.is_null(False),
+                ]
+            )
+        )
 
     async def _get_pick_results(
         self, year: int, week_condition, league_id: int, user: str = None
@@ -214,6 +264,7 @@ class ResultsService(BaseService):
                     status=pick["status"],
                     score=pick["score"],
                     pick_status=pick["pick_status"],
+                    week=pick["week_number"],
                 )
             )
             user_results[pick["username"]]["total_score"] += pick["score"]
@@ -238,6 +289,20 @@ class ResultsService(BaseService):
             league_id=league_id,
         )
 
+    def get_graded_picks_through_week(
+        self, year: int, week: int, league_id: int
+    ) -> list[dict]:
+        """
+        Graded picks from week one through `week` -- what a standing is the sum
+        of. Exists so the week bound stays a peewee expression in this module
+        rather than something every caller has to build.
+        """
+        return self.get_graded_picks(
+            year=year,
+            week_condition=(_week_model.week_number <= week),
+            league_id=league_id,
+        )
+
     async def get_user_pick_results(
         self, year: int, week: int, league_id: int, user: str = None
     ) -> list[UserPickResultsDto]:
@@ -246,7 +311,20 @@ class ResultsService(BaseService):
             year, week_condition, league_id=league_id, user=user
         )
 
-    import asyncio
+    async def get_season_pick_results(
+        self, year: int, league_id: int, user: str = None
+    ) -> list[UserPickResultsDto]:
+        """
+        Every graded pick of a season in one answer.
+
+        This exists because the profile's team counts previously asked
+        `user-picks` once per week and stitched the answers together -- up to
+        eighteen requests, each its own cold start, to fill one card. The query
+        underneath is the same one a single week runs, without the week bound.
+        """
+        return await self._get_pick_results(
+            year, None, league_id=league_id, user=user
+        )
 
     async def get_pick_history_for_year(
         self, year: int, week: int, league_id: int, user: str = None

@@ -275,3 +275,15 @@ class ActionModel(BaseModel):
 
     class Meta:
         table_name = "action"
+
+
+class PasswordResetTokensModel(BaseModel):
+    user = ForeignKeyField(
+        UserModel, backref="password_reset_tokens", on_delete="CASCADE"
+    )
+    token_hash = CharField(max_length=64, unique=True)
+    expires_at = DateTimeField()
+    used_at = DateTimeField(null=True)
+
+    class Meta:
+        table_name = "password_reset_tokens"

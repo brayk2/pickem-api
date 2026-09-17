@@ -1,12 +1,12 @@
 from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from src.components.auth.auth_models import DecodedToken
-from src.components.auth.auth_exceptions import (
+from src.security.security_models import DecodedToken
+from src.security.security_exceptions import (
     InvalidTokenException,
     InsufficientRoleException,
 )
-from src.services.oauth_service import OAuthService
+from src.security.oauth_service import OAuthService
 
 
 class PermissionChecker:

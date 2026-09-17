@@ -10,7 +10,7 @@ from src.models.db_models import (
     GameResultModel,
 )
 from src.components.week.week_service import WeekService
-from src.services.scrapers.base_scraper import BaseScraper
+from src.components.scrape.scrapers.base_scraper import BaseScraper
 
 
 class EspnScraper(BaseScraper):

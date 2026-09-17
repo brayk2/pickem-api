@@ -2,17 +2,17 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import JSONResponse
 from mangum import Mangum
 from starlette.middleware.cors import CORSMiddleware
-from src.api.routes.ping_router import ping_router
+from src.components.health.health_router import health_router
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.components.admin.admin_router import admin_router
-from src.api.routes.game_router import game_router
+from src.components.game.game_router import game_router
 from src.components.league.league_router import league_router
 from src.components.pick.pick_router import picks_router
-from src.api.routes.scrape_router import scrape_router
-from src.api.routes.spread_router import spread_router
-from src.api.routes.team_router import team_router
+from src.components.scrape.scrape_router import scrape_router
+from src.components.spread.spread_router import spread_router
+from src.components.team.team_router import team_router
 from src.components.auth.auth_router import auth_router
 from src.components.results.results_router import results_router
 from src.components.roles.roles_router import roles_router
@@ -87,6 +87,6 @@ app.include_router(team_router)
 app.include_router(scrape_router)
 
 # ping router
-app.include_router(ping_router)
+app.include_router(health_router)
 
 handler = Mangum(app, api_gateway_base_path="/api")

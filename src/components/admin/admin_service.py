@@ -3,10 +3,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from src.config.base_service import BaseService
-from src.models.dto.action_dto import CreateActionRequest, ActionType
-from src.models.dto.week_dto import WeekDto
+from src.components.admin.admin_models import CreateActionRequest, ActionType
+from src.components.week.week_models import WeekDto
 from src.util.injection import dependency, inject
-from src.services.property_service import PropertyService
+from src.components.property.property_service import PropertyService
 from src.models.db_models import PropertyModel, WeekModel, SeasonModel
 
 

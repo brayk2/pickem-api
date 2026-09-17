@@ -1,10 +1,10 @@
 import logging
 from fastapi import APIRouter, Depends, Query
 
-from src.components.auth.auth_models import DecodedToken
-from src.components.auth.permission_checker import PermissionChecker
+from src.security.security_models import DecodedToken
+from src.security.permission_checker import PermissionChecker
 from src.components.league.league_permission import LeaguePermission
-from src.components.results.results_dto import (
+from src.components.results.results_models import (
     UserPickResultsDto,
     LeaguePickResultsDto,
     GameResultDto,
@@ -12,10 +12,10 @@ from src.components.results.results_dto import (
     WeekResultsDto,
 )
 from src.components.results.results_service import ResultsService
-from src.components.results.results_stats_dto import WeekStatsDto
+from src.components.results.results_stats_models import WeekStatsDto
 from src.components.results.results_stats_service import ResultsStatsService
 from src.config.logger import Logger
-from src.services.spread_service import SpreadService
+from src.components.spread.spread_service import SpreadService
 
 results_router = APIRouter(
     prefix="/results",
@@ -37,6 +37,36 @@ async def get_user_pick_results(
         year, week, league_id=league_id, user=token.sub
     ):
         return picks[0]
+    return UserPickResultsDto(username=token.sub, picks=[], total_score=0, rank=None)
+
+
+@results_router.get("/{league_id}/{year}/user-picks", response_model=UserPickResultsDto)
+async def get_season_user_pick_results(
+    league_id: int,
+    year: int,
+    results_service: ResultsService = Depends(ResultsService.create),
+    logger: Logger = Depends(Logger),
+    token: DecodedToken = Depends(LeaguePermission.league_member),
+):
+    """
+    Every graded pick you have made this season, in one answer.
+
+    The per-week route above answers for one week, which meant the profile's
+    team counts asked it eighteen times to fill a single card. Ungraded picks
+    are absent rather than pending: only concluded games are returned, so this
+    reaches as far into the season as results have, and no further.
+
+    `rank` is deliberately null. The score here is a season total for one
+    player, with nobody to rank them against -- returning the 1 that ranking a
+    single-row result produces would read as a league position.
+    """
+    logger.info(f"Getting season pick results for league {league_id}, {year}")
+    if results := await results_service.get_season_pick_results(
+        year, league_id=league_id, user=token.sub
+    ):
+        season = results[0]
+        season.rank = None
+        return season
     return UserPickResultsDto(username=token.sub, picks=[], total_score=0, rank=None)
 
 

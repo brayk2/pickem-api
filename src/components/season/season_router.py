@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from .season_service import SeasonService
-from src.components.auth.permission_checker import PermissionChecker
-from src.components.season.season_dtos import (
+from src.security.permission_checker import PermissionChecker
+from src.components.season.season_models import (
     GetCurrentWeekAndYearResponseDto,
     SetCurrentWeekResponseDto,
     GetCurrentYearResponseDto,

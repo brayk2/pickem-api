@@ -1,5 +1,5 @@
 from src.models.db_models import TeamModel
-from src.services.scrapers.base_scraper import BaseScraper
+from src.components.scrape.scrapers.base_scraper import BaseScraper
 
 
 class NflScraper(BaseScraper):

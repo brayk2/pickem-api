@@ -1,13 +1,21 @@
 from fastapi import APIRouter, Depends
+from starlette import status
+from starlette.responses import JSONResponse
+
+from src.security.security_models import TokenResponse
 from src.components.auth.auth_models import (
-    TokenResponse,
     LoginRequest,
     TokenRefreshRequest,
+    PasswordResetRequestResponse,
+    PasswordResetRequestBody,
+    PasswordResetErrorResponse,
+    PasswordResetConfirmResponse,
+    PasswordResetConfirmBody,
 )
-from src.components.auth.auth_exceptions import IncorrectCredentialsException
+from src.security.security_exceptions import IncorrectCredentialsException
 from src.components.league.league_service import LeagueService
 from src.components.roles.roles_service import RolesService
-from src.services.oauth_service import OAuthService
+from src.security.oauth_service import OAuthService
 from src.components.user.user_service import UserService
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -64,3 +72,22 @@ async def refresh_access_token(
     )
 
     return tokens
+
+
+@auth_router.post(
+    "/token/password-reset/request",
+    response_model=PasswordResetRequestResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def reset_password_request(body: PasswordResetRequestBody): ...
+
+
+@auth_router.post(
+    "/token/password-reset/confirm",
+    response_model=PasswordResetConfirmResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": PasswordResetErrorResponse},
+    },
+)
+async def reset_password_confirm(body: PasswordResetConfirmBody): ...

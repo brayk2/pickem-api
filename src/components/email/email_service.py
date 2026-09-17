@@ -6,7 +6,7 @@ import os
 
 from src.config.base_service import BaseService
 from src.config.logger import Logger
-from src.services.secret_service import SecretService
+from src.integrations.secret_service import SecretService
 from src.util.injection import dependency, inject
 
 
