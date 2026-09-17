@@ -185,8 +185,13 @@ class GameModel(BaseModel):
     week = ForeignKeyField(WeekModel, backref="games", on_delete="CASCADE")
     home_team = ForeignKeyField(TeamModel, backref="home_games", on_delete="CASCADE")
     away_team = ForeignKeyField(TeamModel, backref="away_games", on_delete="CASCADE")
-    start_date = DateField()  # New field for the start date of the game
-    start_time = TimeField()  # New field for the start time of the game
+    # Nullable, and legitimately so: the NFL flex-schedules, so a game has no
+    # kickoff until the league sets one. kickoff() returns None for those and
+    # has_started() refuses to lock a pick on a time nobody knows. Declared
+    # non-null here while the column was nullable, which is the wrong way round
+    # -- the database was right.
+    start_date = DateField(null=True)
+    start_time = TimeField(null=True)
 
     class Meta:
         table_name = "game"
