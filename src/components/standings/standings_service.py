@@ -1,16 +1,22 @@
-import asyncio
+from peewee import fn
 
-from src.components.results.results_dto import UserPickResultsDto, PickDto
 from src.components.league.league_service import LeagueService
 from src.components.results.results_service import ResultsService
 from src.components.standings.standings_dtos import (
+    LeagueSeasonStandingsDto,
     StandingsDto,
     StandingsHistoryDto,
     UserHistoryDto,
 )
+from src.models.db_models import SeasonModel, WeekModel
 from src.config.base_service import BaseService
 from src.config.logger import Logger
 from src.util.injection import dependency, inject
+
+# A covered pick is a correct pick, a push half of one, a miss none. This is
+# the "record" sense of correct, distinct from the score, which weights the
+# same outcomes by the confidence staked on them.
+CORRECT_VALUES = {"COVERED": 1.0, "PUSHED": 0.5, "FAILED": 0.0}
 
 
 @dependency
@@ -30,144 +36,221 @@ class StandingsService(BaseService):
         self.logger = logger
 
     @staticmethod
-    async def _calc_correct_picks(picks: list[PickDto]) -> float:
-        status_scores = {
-            "COVERED": 1,
-            "PUSHED": 0.5,
-            "FAILED": 0,
+    def seed_totals(usernames) -> dict[str, dict]:
+        """
+        A zeroed row for every member of the season.
+
+        Seeded from the roster rather than from pick activity, so a member who
+        has missed every week so far still appears at zero rather than
+        vanishing from the table.
+        """
+        return {
+            username: {"score": 0.0, "correct": 0.0, "total": 0}
+            for username in usernames
         }
-        return sum(status_scores.get(pick.pick_status, 0) for pick in picks)
 
     @staticmethod
-    async def _calc_total_picks(picks: list[PickDto]) -> int:
-        return len(picks)
+    def accumulate(totals: dict[str, dict], row: dict) -> None:
+        """Fold one graded pick into a player's running totals."""
+        entry = totals.get(row["username"])
+        if entry is None:
+            # A pick from someone no longer on the roster still counts: the
+            # season happened.
+            entry = totals[row["username"]] = {"score": 0.0, "correct": 0.0, "total": 0}
+
+        entry["score"] += row["score"] or 0.0
+        entry["correct"] += CORRECT_VALUES.get(row["pick_status"], 0.0)
+        entry["total"] += 1
 
     @staticmethod
-    async def _aggregate_scores(picks: list[PickDto]) -> int:
-        return sum(pick.score for pick in picks if pick.score is not None)
+    def rank(totals: dict[str, dict]) -> list[StandingsDto]:
+        """Totals to a ranked table, highest score first."""
+        standings = [
+            StandingsDto(
+                username=username,
+                rank=0,  # assigned below, once sorted
+                correct_picks=entry["correct"],
+                total_picks=entry["total"],
+                score=entry["score"],
+            )
+            for username, entry in totals.items()
+        ]
+
+        standings.sort(key=lambda standing: standing.score, reverse=True)
+        for position, standing in enumerate(standings, start=1):
+            standing.rank = position
+
+        return standings
+
+    def season_members(self, league_id: int, year: int) -> list[str]:
+        league_season = self.league_service.get_league_season(
+            league_id=league_id, year=year
+        )
+        return [
+            member.username
+            for member in self.league_service.list_members(league_season=league_season)
+        ]
+
+    def build_standings(self, rows: list[dict], usernames) -> list[StandingsDto]:
+        """A ranked table from already-graded rows."""
+        totals = self.seed_totals(usernames)
+        for row in rows:
+            self.accumulate(totals, row)
+        return self.rank(totals)
 
     async def get_standings_for_week(
         self, year: int, week: int, league_id: int
     ) -> list[StandingsDto]:
-        # Fetch user pick results up to the specified year and week
+        """
+        The table as it stood after `week`, counting everything from week one.
+
+        Reads the flat graded rows rather than the grouped result DTOs. A
+        standing is five numbers per player, and building a PickDto -- with its
+        nested team, thumbnail and colours -- for each of a season's ~1,080
+        picks to produce them was a thousand objects constructed and discarded
+        per request.
+        """
         self.logger.info(
             f"Fetching standings for league {league_id}, year {year} up to week {week}"
         )
 
-        league_season = self.league_service.get_league_season(
-            league_id=league_id, year=year
+        usernames = self.season_members(league_id=league_id, year=year)
+        rows = self.results_service.get_graded_picks_through_week(
+            year=year, week=week, league_id=league_id
         )
 
-        pick_results: list[UserPickResultsDto] = (
-            await self.results_service.get_pick_history_for_year(
-                year=year, week=week, league_id=league_id
-            )
-        )
-
-        # Seed from the roster, not from pick activity, so a member who missed
-        # every week so far still appears at zero rather than vanishing.
-        user_aggregated_results = {
-            member.username: {
-                "picks": [],
-                "total_score": 0,
-                "correct_picks": 0,
-                "total_picks": 0,
-            }
-            for member in self.league_service.list_members(league_season=league_season)
-        }
-
-        # Accumulate results across all weeks up to the specified week
-        for user_picks in pick_results:
-            username = user_picks.username
-            if username not in user_aggregated_results:
-                user_aggregated_results[username] = {
-                    "picks": [],
-                    "total_score": 0,
-                    "correct_picks": 0,
-                    "total_picks": 0,
-                }
-
-            # Extend the picks list with picks from this user for all weeks
-            user_aggregated_results[username]["picks"].extend(user_picks.picks)
-
-            # Aggregate scores, correct picks, and total picks
-            user_aggregated_results[username][
-                "total_score"
-            ] += await self._aggregate_scores(user_picks.picks)
-            user_aggregated_results[username][
-                "correct_picks"
-            ] += await self._calc_correct_picks(user_picks.picks)
-            user_aggregated_results[username][
-                "total_picks"
-            ] += await self._calc_total_picks(user_picks.picks)
-
-        # Calculate standings
-        standings = []
-        for username, data in user_aggregated_results.items():
-            standings.append(
-                StandingsDto(
-                    username=username,
-                    rank=0,  # To be calculated after sorting by score
-                    correct_picks=data["correct_picks"],
-                    total_picks=data["total_picks"],
-                    score=data["total_score"],
-                )
-            )
-
-        # Sort standings by score and assign ranks
-        standings.sort(key=lambda x: x.score, reverse=True)
-        for rank, standing in enumerate(standings, start=1):
-            standing.rank = rank
-
+        standings = self.build_standings(rows, usernames)
         self.logger.info(f"Standings calculated for week {week} of year {year}")
-
         return standings
 
     async def get_standings_history(
         self, year: int, week: int, league_id: int
     ) -> StandingsHistoryDto:
+        """
+        Every week's table in one answer, for the movement chart.
+
+        This used to call get_standings_for_week once per week, and each of
+        those graded weeks one through w -- so asking for week 18 graded 60
+        picks, then 120, then 180, all the way up: ~10,260 picks and 54 queries
+        to produce 216 rows, and quadratic in the week number, meaning it was
+        at its worst in January.
+
+        A standing is a running total, so the season is graded once and the
+        weeks are accumulated in order. Same answer, one pass.
+        """
         weeks = list(range(1, week + 1))
         self.logger.info(f"Defined weeks as {weeks}")
 
-        semaphore = asyncio.Semaphore(10)  # Limit concurrency to 10 tasks at a time
+        usernames = self.season_members(league_id=league_id, year=year)
+        rows = self.results_service.get_graded_picks_through_week(
+            year=year, week=week, league_id=league_id
+        )
 
-        async def fetch_week_standings(w):
-            async with semaphore:
-                try:
-                    standings = await self.get_standings_for_week(
-                        year, w, league_id=league_id
-                    )
-                    return w, standings  # Return the week number along with standings
-                except Exception as e:
-                    self.logger.error(f"Error fetching standings for week {w}: {e}")
-                    return w, []  # Return an empty list if an error occurs
+        by_week: dict[int, list[dict]] = {w: [] for w in weeks}
+        for row in rows:
+            # A row outside the asked-for range cannot happen, but a week with
+            # no graded picks must still produce a table -- everyone holds
+            # their score.
+            by_week.setdefault(row["week_number"], []).append(row)
 
-        # Run all tasks concurrently
-        standings_tasks = [fetch_week_standings(w) for w in weeks]
-        all_weeks_standings = await asyncio.gather(*standings_tasks)
-
+        totals = self.seed_totals(usernames)
         user_histories: dict[str, UserHistoryDto] = {}
 
-        # Process each week's standings
-        for week_number, standings in all_weeks_standings:
-            for standing in standings:
-                if standing.username not in user_histories:
-                    user_histories[standing.username] = UserHistoryDto(
-                        username=standing.username,
-                        ranks=[],
-                        scores=[],
-                        pcts=[],
+        for week_number in weeks:
+            for row in by_week.get(week_number, []):
+                self.accumulate(totals, row)
+
+            for standing in self.rank(totals):
+                history = user_histories.get(standing.username)
+                if history is None:
+                    history = user_histories[standing.username] = UserHistoryDto(
+                        username=standing.username, ranks=[], scores=[], pcts=[]
                     )
-                user_history = user_histories[standing.username]
-                user_history.ranks.append(standing.rank)
-                user_history.scores.append(standing.score)
-                pct = (
+
+                history.ranks.append(standing.rank)
+                history.scores.append(standing.score)
+                history.pcts.append(
                     (standing.correct_picks / standing.total_picks)
                     if standing.total_picks > 0
                     else 0.0
                 )
-                user_history.pcts.append(pct)
 
         return StandingsHistoryDto(
             year=year, weeks=weeks, users=list(user_histories.values())
         )
+
+    def finished_years(self, years: list[int]) -> set[int]:
+        """
+        Of the years asked about, those whose every week is marked complete.
+
+        A season still being played has a week that is not done, so it has a
+        leader rather than a champion. A season with no weeks at all is not
+        finished either -- nothing has happened to finish it -- and falls out
+        of this set by being absent from the grouping.
+        """
+        if not years:
+            return set()
+
+        return {
+            row["year"]
+            for row in (
+                WeekModel.select(
+                    SeasonModel.year.alias("year"),
+                    fn.BOOL_AND(WeekModel.completed).alias("all_done"),
+                )
+                .join(SeasonModel, on=(WeekModel.season == SeasonModel.id))
+                .where(SeasonModel.year.in_(list(years)))
+                .group_by(SeasonModel.year)
+                .dicts()
+            )
+            if row["all_done"]
+        }
+
+    def get_league_history(self, league_id: int) -> list[LeagueSeasonStandingsDto]:
+        """
+        Every season the league has played, each with its final table.
+
+        This lives here rather than on LeagueService because it is standings:
+        it needs the grader and the ranking, and LeagueService cannot reach
+        either without importing what already imports it.
+
+        The point of the endpoint is that the work does not grow with the
+        league's age. Building this in the client meant a standings request per
+        season -- so a query, a grading pass and a Lambda invocation for every
+        year, one more every autumn, forever. Here it is four queries whether
+        the league is two years old or twenty.
+        """
+        seasons = self.league_service.list_league_seasons(league_id=league_id)
+        if not seasons:
+            return []
+
+        season_ids = [season.id for season in seasons]
+        rows = self.results_service.get_graded_picks_for_seasons(season_ids)
+        rosters = self.league_service.list_members_by_season(season_ids)
+        finished = self.finished_years([season.year for season in seasons])
+
+        by_year: dict[int, list[dict]] = {}
+        for row in rows:
+            by_year.setdefault(row["year"], []).append(row)
+
+        history = []
+        for season in seasons:
+            usernames = [member.username for member in rosters.get(season.id, [])]
+            standings = self.build_standings(by_year.get(season.year, []), usernames)
+
+            # A season nobody has scored in has no leader: every member is
+            # seeded at zero, so the top row would just be whoever sorted
+            # first.
+            leader = standings[0] if standings and standings[0].score > 0 else None
+
+            history.append(
+                LeagueSeasonStandingsDto(
+                    year=season.year,
+                    in_progress=season.year not in finished,
+                    player_count=len(usernames),
+                    leader=leader,
+                    standings=standings,
+                )
+            )
+
+        return sorted(history, key=lambda season: season.year, reverse=True)

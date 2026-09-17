@@ -13,6 +13,8 @@ from src.components.league.league_models import (
     LeagueSeasonDto,
 )
 from src.components.league.league_service import LeagueService
+from src.components.standings.standings_dtos import LeagueSeasonStandingsDto
+from src.components.standings.standings_service import StandingsService
 
 league_router = APIRouter(prefix="/league", tags=["Leagues"])
 
@@ -37,6 +39,28 @@ async def create_league(
     return league_service.create_league(
         name=request.name, description=request.description
     )
+
+
+@league_router.get(
+    "/{league_id}/history", response_model=list[LeagueSeasonStandingsDto]
+)
+async def get_league_history(
+    league_id: int,
+    standings_service: StandingsService = Depends(StandingsService.create),
+    _: DecodedToken = Depends(LeaguePermission.league_member),
+):
+    """
+    Every season this league has played, newest first, each with its table.
+
+    One answer for the whole history. The alternative -- and what the web app
+    did -- is a standings request per season, which costs a query, a full
+    grading pass and an invocation for every year the league has existed, and
+    grows by one more every autumn.
+
+    A season is in progress until every week in it is marked complete, so the
+    last line has a leader where the rest have champions.
+    """
+    return standings_service.get_league_history(league_id=league_id)
 
 
 @league_router.get("/{league_id}/seasons", response_model=list[LeagueSeasonDto])
