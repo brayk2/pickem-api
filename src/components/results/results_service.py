@@ -85,7 +85,7 @@ class ResultsService(BaseService):
         self.league_service = league_service
 
     def get_graded_picks(
-        self, year: int, week_condition, league_id: int, user: str = None
+        self, year: int, league_id: int, week_condition=None, user: str = None
     ) -> list[dict]:
         """
         Every graded pick for a league-season, as flat rows with `pick_status`
@@ -95,15 +95,30 @@ class ResultsService(BaseService):
         by player; the week statistics group the same rows by game. Grading them
         twice in two places is how the two views drift apart.
 
+        Only concluded games are returned -- the join requires both scores -- so
+        an unbounded week means "everything played so far" without the caller
+        having to know which week that is.
+
         :param year:
-        :param week_condition: a peewee expression over the week, so callers can
-            ask for one week or every week up to one
         :param league_id: the league whose picks to return
+        :param week_condition: a peewee expression over the week, so callers can
+            ask for one week or every week up to one. `None` asks for the whole
+            season.
         :param user: restrict to a single player
         """
         league_season = self.league_service.get_league_season(
             league_id=league_id, year=year
         )
+
+        conditions = [
+            _season.year == year,
+            _pick.league_season == league_season.id,
+            _game_result.home_score.is_null(False),  # Ensure the game has concluded
+            _game_result.away_score.is_null(False),  # Ensure the game has concluded
+        ]
+        if week_condition is not None:
+            conditions.append(week_condition)
+
         query = (
             _pick.select(
                 _pick.id,
@@ -145,13 +160,12 @@ class ResultsService(BaseService):
             .join(_game_result, on=(_game_result.game == _game.id))
             .join(_season, on=(_game.season == _season.id))
             .join(_week_model, on=(_game.week == _week_model.id))
-            .where(
-                _season.year == year,
-                _pick.league_season == league_season.id,
-                week_condition,
-                _game_result.home_score.is_null(False),  # Ensure the game has concluded
-                _game_result.away_score.is_null(False),  # Ensure the game has concluded
-            )
+            .where(*conditions)
+            # Ordered so a season's picks arrive as a season reads. Nothing
+            # downstream depended on the previous order -- the results page
+            # looks picks up by confidence -- but a flat list of ninety picks
+            # in whatever order the planner chose is not something to hand out.
+            .order_by(_week_model.week_number, _pick.confidence.desc())
         )
 
         if user:
@@ -214,6 +228,7 @@ class ResultsService(BaseService):
                     status=pick["status"],
                     score=pick["score"],
                     pick_status=pick["pick_status"],
+                    week=pick["week_number"],
                 )
             )
             user_results[pick["username"]]["total_score"] += pick["score"]
@@ -246,7 +261,20 @@ class ResultsService(BaseService):
             year, week_condition, league_id=league_id, user=user
         )
 
-    import asyncio
+    async def get_season_pick_results(
+        self, year: int, league_id: int, user: str = None
+    ) -> list[UserPickResultsDto]:
+        """
+        Every graded pick of a season in one answer.
+
+        This exists because the profile's team counts previously asked
+        `user-picks` once per week and stitched the answers together -- up to
+        eighteen requests, each its own cold start, to fill one card. The query
+        underneath is the same one a single week runs, without the week bound.
+        """
+        return await self._get_pick_results(
+            year, None, league_id=league_id, user=user
+        )
 
     async def get_pick_history_for_year(
         self, year: int, week: int, league_id: int, user: str = None

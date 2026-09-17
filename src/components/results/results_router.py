@@ -40,6 +40,36 @@ async def get_user_pick_results(
     return UserPickResultsDto(username=token.sub, picks=[], total_score=0, rank=None)
 
 
+@results_router.get("/{league_id}/{year}/user-picks", response_model=UserPickResultsDto)
+async def get_season_user_pick_results(
+    league_id: int,
+    year: int,
+    results_service: ResultsService = Depends(ResultsService.create),
+    logger: Logger = Depends(Logger),
+    token: DecodedToken = Depends(LeaguePermission.league_member),
+):
+    """
+    Every graded pick you have made this season, in one answer.
+
+    The per-week route above answers for one week, which meant the profile's
+    team counts asked it eighteen times to fill a single card. Ungraded picks
+    are absent rather than pending: only concluded games are returned, so this
+    reaches as far into the season as results have, and no further.
+
+    `rank` is deliberately null. The score here is a season total for one
+    player, with nobody to rank them against -- returning the 1 that ranking a
+    single-row result produces would read as a league position.
+    """
+    logger.info(f"Getting season pick results for league {league_id}, {year}")
+    if results := await results_service.get_season_pick_results(
+        year, league_id=league_id, user=token.sub
+    ):
+        season = results[0]
+        season.rank = None
+        return season
+    return UserPickResultsDto(username=token.sub, picks=[], total_score=0, rank=None)
+
+
 @results_router.get("/{league_id}/{year}/{week}/history", response_model=list[WeekResultsDto])
 async def get_user_pick_history(
     league_id: int,

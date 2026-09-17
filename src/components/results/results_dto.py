@@ -84,6 +84,10 @@ class PickDto(BaseDto):
     pick_status: Literal["COVERED", "FAILED", "PUSHED", "UNKNOWN"] | None = Field(
         default=None
     )
+    # Which week the pick belongs to. Redundant on the per-week routes, where
+    # the path already says, but a season's worth of picks arrives as one flat
+    # list and would otherwise have no way to say when any of it happened.
+    week: int | None = Field(default=None)
 
 
 class UserPickResultsDto(BaseDto):
