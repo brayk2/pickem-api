@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Path
 from starlette import status
 
-from src.components.auth.auth_models import DecodedToken
-from src.components.auth.permission_checker import PermissionChecker
+from src.security.security_models import DecodedToken
+from src.security.permission_checker import PermissionChecker
 from src.components.league.league_permission import LeaguePermission
 from src.components.pick.pick_models import (
     SubmitPicksRequestDto,

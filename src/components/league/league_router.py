@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Path
 from starlette import status
 
-from src.components.auth.auth_models import DecodedToken
-from src.components.auth.permission_checker import PermissionChecker
+from src.security.security_models import DecodedToken
+from src.security.permission_checker import PermissionChecker
 from src.components.league.league_permission import LeaguePermission
 from src.components.league.league_models import (
     AddLeagueMemberRequest,
@@ -13,7 +13,7 @@ from src.components.league.league_models import (
     LeagueSeasonDto,
 )
 from src.components.league.league_service import LeagueService
-from src.components.standings.standings_dtos import LeagueSeasonStandingsDto
+from src.components.standings.standings_models import LeagueSeasonStandingsDto
 from src.components.standings.standings_service import StandingsService
 
 league_router = APIRouter(prefix="/league", tags=["Leagues"])

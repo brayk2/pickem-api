@@ -1,10 +1,10 @@
 import logging
 from fastapi import APIRouter, Depends, Query
 
-from src.components.auth.auth_models import DecodedToken
-from src.components.auth.permission_checker import PermissionChecker
+from src.security.security_models import DecodedToken
+from src.security.permission_checker import PermissionChecker
 from src.components.league.league_permission import LeaguePermission
-from src.components.results.results_dto import (
+from src.components.results.results_models import (
     UserPickResultsDto,
     LeaguePickResultsDto,
     GameResultDto,
@@ -12,10 +12,10 @@ from src.components.results.results_dto import (
     WeekResultsDto,
 )
 from src.components.results.results_service import ResultsService
-from src.components.results.results_stats_dto import WeekStatsDto
+from src.components.results.results_stats_models import WeekStatsDto
 from src.components.results.results_stats_service import ResultsStatsService
 from src.config.logger import Logger
-from src.services.spread_service import SpreadService
+from src.components.spread.spread_service import SpreadService
 
 results_router = APIRouter(
     prefix="/results",

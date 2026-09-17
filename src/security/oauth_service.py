@@ -2,16 +2,16 @@ from datetime import datetime, timedelta
 from typing import List
 import pytz
 from jose import JWTError, jwt
-from src.components.auth.auth_models import (
+from src.security.security_models import (
     DecodedToken,
     LeagueClaim,
     TokenResponse,
 )
-from src.components.auth.auth_exceptions import InvalidTokenException
+from src.security.security_exceptions import InvalidTokenException
 from src.config.base_service import BaseService
 from src.config.settings import Settings
-from src.services.password_manager import PasswordManager
-from src.services.secret_service import SecretService
+from src.security.password_manager import PasswordManager
+from src.integrations.secret_service import SecretService
 from src.util.injection import dependency, inject
 
 

@@ -1,6 +1,6 @@
 from peewee import DoesNotExist, IntegrityError
 
-from src.components.auth.auth_models import LeagueClaim
+from src.security.security_models import LeagueClaim
 from src.components.league.league_exceptions import (
     DuplicateLeagueException,
     DuplicateLeagueMemberException,

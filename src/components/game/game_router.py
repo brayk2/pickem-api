@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from src.components.auth.permission_checker import PermissionChecker
-from src.models.dto.dto import Game
+from src.security.permission_checker import PermissionChecker
+from src.components.game.game_models import Game
 from src.models.db_models import GameModel, SeasonModel
 
 game_router = APIRouter(

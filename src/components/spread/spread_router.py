@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
-from src.components.auth.permission_checker import PermissionChecker
-from src.components.results.results_dto import MatchupDto
-from src.services.spread_service import SpreadService
+from src.security.permission_checker import PermissionChecker
+from src.components.results.results_models import MatchupDto
+from src.components.spread.spread_service import SpreadService
 
 spread_service = SpreadService()
 spread_router = APIRouter(

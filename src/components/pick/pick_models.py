@@ -1,7 +1,7 @@
 from pydantic import conlist, Field
 from strenum import StrEnum
 
-from src.components.results.results_dto import MatchupDto, TeamDto, PickDto
+from src.components.results.results_models import MatchupDto, TeamDto, PickDto
 from src.models.base_models import BaseDto
 
 

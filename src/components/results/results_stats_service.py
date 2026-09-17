@@ -1,8 +1,8 @@
 from collections import Counter, defaultdict
 from statistics import mean, median
 
-from src.components.results.results_dto import TeamDto
-from src.components.results.results_stats_dto import (
+from src.components.results.results_models import TeamDto
+from src.components.results.results_stats_models import (
     ConfidenceBreakdownDto,
     GameAwardDto,
     GameBreakdownDto,

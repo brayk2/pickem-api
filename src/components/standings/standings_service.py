@@ -2,7 +2,7 @@ from peewee import fn
 
 from src.components.league.league_service import LeagueService
 from src.components.results.results_service import ResultsService
-from src.components.standings.standings_dtos import (
+from src.components.standings.standings_models import (
     LeagueSeasonStandingsDto,
     StandingsDto,
     StandingsHistoryDto,

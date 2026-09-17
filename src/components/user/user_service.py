@@ -1,6 +1,6 @@
 from peewee import DoesNotExist, IntegrityError
-from src.components.auth.auth_models import DecodedToken
-from src.components.auth.auth_exceptions import InvalidTokenException
+from src.security.security_models import DecodedToken
+from src.security.security_exceptions import InvalidTokenException
 from src.components.email.email_service import EmailService
 from src.components.roles.roles_service import RolesService
 from src.components.user.password_generator import gen_pass
@@ -16,7 +16,7 @@ from src.components.user.user_models import (
 )
 from src.config.base_service import BaseService
 from src.models.db_models import UserModel
-from src.services.oauth_service import OAuthService
+from src.security.oauth_service import OAuthService
 from src.util.injection import dependency, inject
 
 

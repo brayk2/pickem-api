@@ -3,7 +3,7 @@ from datetime import datetime
 import pytz
 from peewee import fn, Case, JOIN
 
-from src.components.results.results_dto import MatchupDto, TeamDto
+from src.components.results.results_models import MatchupDto, TeamDto
 from src.config.base_service import BaseService
 from src.models.db_models import (
     SpreadModel,
@@ -13,7 +13,7 @@ from src.models.db_models import (
     TeamResultModel,
     WeekModel,
 )
-from src.services.odds_api_service import (
+from src.components.spread.odds_api_service import (
     OddsApiService,
     OddsDto,
 )

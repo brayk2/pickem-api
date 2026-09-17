@@ -6,12 +6,12 @@ from src.components.pick.pick_models import (
     UserPicksDto,
     TeamDto,
 )
-from src.components.auth.auth_models import DecodedToken
+from src.security.security_models import DecodedToken
 from src.components.league.league_exceptions import (
     NotALeagueMemberException,
 )
 from src.components.league.league_service import LeagueService
-from src.components.results.results_dto import MatchupDto
+from src.components.results.results_models import MatchupDto
 from src.config.base_service import BaseService
 from src.models.db_models import (
     GameModel,

@@ -1,16 +1,16 @@
 from fastapi import APIRouter, Depends, Query
 from playhouse.shortcuts import model_to_dict
 
-from src.components.admin.admin_exception import (
+from src.components.admin.admin_exceptions import (
     PropertyNotFoundException,
 )
 from src.components.admin.admin_service import AdminService, PaginationOptions
-from src.components.auth.auth_models import DecodedToken
-from src.components.auth.permission_checker import PermissionChecker
+from src.security.security_models import DecodedToken
+from src.security.permission_checker import PermissionChecker
 from src.config.logger import Logger
-from src.models.dto.action_dto import CreateActionRequest
-from src.models.dto.admin_dtos import ApiQuota
-from src.models.dto.group_dto import CreateGroupRequest, CreateGroupResponse
+from src.components.admin.admin_models import CreateActionRequest
+from src.components.admin.admin_models import ApiQuota
+from src.components.admin.admin_models import CreateGroupRequest, CreateGroupResponse
 from src.components.week.week_models import (
     SetWeekCompletionRequest,
     WeekCompletionDto,

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from starlette import status
 
-from src.components.auth.permission_checker import PermissionChecker
+from src.security.permission_checker import PermissionChecker
 from src.components.user.user_models import UserDto
 from src.components.user.user_service import UserService
 

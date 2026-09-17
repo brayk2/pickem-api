@@ -1,6 +1,6 @@
 import asyncio
 
-from src.components.results.results_dto import (
+from src.components.results.results_models import (
     UserPickResultsDto,
     WeekResultsDto,
     GameResultDto,

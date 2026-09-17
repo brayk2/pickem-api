@@ -2,7 +2,7 @@ from peewee import PostgresqlDatabase
 from playhouse.pool import PooledPostgresqlDatabase
 from src.config.logger import Logger
 from src.config.settings import Settings
-from src.services.secret_service import SecretService
+from src.integrations.secret_service import SecretService
 
 logger = Logger()
 
