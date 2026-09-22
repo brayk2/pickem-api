@@ -10,6 +10,7 @@ from peewee import (
     DecimalField,
     DateField,
     TimeField,
+    TextField,
     Check,
 )
 from playhouse.postgres_ext import JSONField
@@ -271,6 +272,35 @@ class PickModel(BaseModel):
                 True,
             ),  # One pick per game per league; the same user may play several leagues
         )
+
+
+class PickOverrideModel(BaseModel):
+    """
+    An admin or commissioner having changed some other player's picks.
+
+    Append-only. `pick.updated_by` records who wrote a row last, which the next
+    write overwrites -- so it cannot say what a slate looked like before it was
+    touched, and that is the only question anyone asks about an override.
+    """
+
+    league_season = ForeignKeyField(
+        LeagueSeasonModel, backref="pick_overrides", on_delete="CASCADE"
+    )
+    # The target: whose picks these are, not who changed them. The actor is a
+    # string, in the same `admin:<username>` form week.updated_by uses, so the
+    # record survives the account that caused it.
+    user = ForeignKeyField(UserModel, backref="pick_overrides", on_delete="CASCADE")
+    week_number = IntegerField()
+    actor = CharField()
+    reason = TextField()
+    # Denormalised slates, so they stay readable after the game, team or spread
+    # they refer to has changed underneath them.
+    before_state = JSONField(default=list)
+    after_state = JSONField(default=list)
+    locks_bypassed = BooleanField(default=False)
+
+    class Meta:
+        table_name = "pick_override"
 
 
 class ActionModel(BaseModel):
