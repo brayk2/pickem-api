@@ -416,9 +416,40 @@ class ResultsService(BaseService):
             year, None, league_id=league_id, user=user
         )
 
+    async def get_user_week_results(
+        self, year: int, week: int, league_id: int, username: str
+    ) -> UserPickResultsDto:
+        """One player's graded picks for a week, or an empty row if there are none."""
+        self.logger.info(f"Getting user pick results for year {year} and week {week}")
+        if picks := await self.get_user_pick_results(
+            year, week, league_id=league_id, user=username
+        ):
+            return picks[0]
+        return UserPickResultsDto(username=username, picks=[], total_score=0, rank=None)
+
+    async def get_user_season_results(
+        self, year: int, league_id: int, username: str
+    ) -> UserPickResultsDto:
+        """
+        One player's graded picks for the whole season, or an empty row.
+
+        `rank` is deliberately null. The score here is a season total for one
+        player, with nobody to rank them against -- returning the 1 that ranking a
+        single-row result produces would read as a league position.
+        """
+        self.logger.info(f"Getting season pick results for league {league_id}, {year}")
+        if results := await self.get_season_pick_results(
+            year, league_id=league_id, user=username
+        ):
+            season = results[0]
+            season.rank = None
+            return season
+        return UserPickResultsDto(username=username, picks=[], total_score=0, rank=None)
+
     async def get_pick_history_for_year(
         self, year: int, week: int, league_id: int, user: str = None
     ) -> list[UserPickResultsDto]:
+        self.logger.info(f"Getting pick history for year {year} through week {week}")
         return await self._get_pick_results(
             year=year,
             week_condition=_week_model.week_number <= week,
@@ -451,6 +482,7 @@ class ResultsService(BaseService):
         staked-but-ungraded ones as numbers in `submitted_confidences`, and a
         slot in neither was never filled.
         """
+        self.logger.info(f"Getting league pick results for year {year} and week {week}")
         results = await self.get_user_pick_results(year, week, league_id=league_id)
         scored = {result.username: result for result in results}
 

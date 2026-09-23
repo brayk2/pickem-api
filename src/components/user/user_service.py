@@ -125,6 +125,24 @@ class UserService(BaseService):
         self.logger.info(f"User '{username}' created successfully.")
         return user
 
+    def invite_user(
+        self, first_name: str, last_name: str, username: str, email: str
+    ) -> dict:
+        """
+        Creates a user with a generated password and emails them their login.
+
+        :return: A message naming who was notified and where.
+        """
+        password = gen_pass()
+        user = self.create_user(
+            first_name=first_name,
+            last_name=last_name,
+            username=username,
+            email=email,
+            password_hash=self.oauth_service.get_password_hash(password=password),
+        )
+        return self.notify_password(user=user, password=password)
+
     def delete_user(self, username: str) -> None:
         """
         Deletes a user from the system.

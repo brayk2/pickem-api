@@ -7,6 +7,7 @@ from src.components.pick.pick_models import (
     PickDto,
     PickOverrideDto,
     PickOverrideSlotDto,
+    SubmitPicksResponseDto,
     UserPicksDto,
     TeamDto,
 )
@@ -45,6 +46,7 @@ from src.components.pick.pick_exceptions import (
     LockOverrideNotAcknowledgedException,
     InvalidGameWeekException,
     OverrideNotFoundException,
+    PathBodyMismatchException,
 )
 from src.util.injection import dependency, inject
 
@@ -281,20 +283,20 @@ class PickService(BaseService):
     async def submit_picks(
         self,
         pick_data: SubmitPicksRequestDto,
-        user: UserModel,
         league_id: int,
         token: DecodedToken,
-    ) -> PickStatus:
+    ) -> SubmitPicksResponseDto:
         """
         A player writing their own week.
 
         :param pick_data: The picks submitted by the user.
-        :param user: The user submitting the picks.
+        :param token: The submitting player's token; the picks are written as them.
         :return: The status of the submitted picks.
         :raises LockedPickException: If a user attempts to change or remove a
             pick whose game has started.
         :raises InvalidGameWeekException: If any pick's game does not belong to the specified year and week.
         """
+        user = self._get_user(token.sub)
         self.logger.info(
             f"attempting to submit picks {pick_data} for user {user.username} "
             f"in league {league_id}"
@@ -313,12 +315,15 @@ class PickService(BaseService):
             league_id=league_id, year=pick_data.year
         )
 
-        return self._write_week(
+        pick_status = self._write_week(
             pick_data=pick_data,
             user=user,
             league_season=league_season,
             actor=None,
             override_locked=False,
+        )
+        return SubmitPicksResponseDto(
+            status=pick_status, detail="Picks submitted successfully."
         )
 
     async def override_picks(
@@ -326,8 +331,10 @@ class PickService(BaseService):
         pick_data: AdminSubmitPicksRequestDto,
         username: str,
         league_id: int,
+        year: int,
+        week_number: int,
         token: DecodedToken,
-    ) -> PickStatus:
+    ) -> SubmitPicksResponseDto:
         """
         An admin or commissioner writing somebody else's week.
 
@@ -342,7 +349,17 @@ class PickService(BaseService):
         access model you get by letting the person who fields the complaints fix
         them; the pick_override row is what makes a self-edit legible afterwards
         rather than preventing it.
+
+        The year and week in the path are authoritative; a body that disagrees is
+        rejected rather than quietly believed, since the path is what the caller
+        navigated to and saw.
         """
+        if pick_data.year != year or pick_data.week != week_number:
+            raise PathBodyMismatchException(
+                path=f"{year} week {week_number}",
+                body=f"{pick_data.year} week {pick_data.week}",
+            )
+
         target = self._get_user(username)
         league_season = self.league_service.get_league_season(
             league_id=league_id, year=pick_data.year
@@ -364,13 +381,16 @@ class PickService(BaseService):
             f"override_locked={pick_data.override_locked}: {pick_data.reason}"
         )
 
-        return self._write_week(
+        pick_status = self._write_week(
             pick_data=pick_data,
             user=target,
             league_season=league_season,
             actor=actor,
             override_locked=pick_data.override_locked,
             reason=pick_data.reason,
+        )
+        return SubmitPicksResponseDto(
+            status=pick_status, detail=f"Picks replaced for {username}."
         )
 
     def _write_week(
@@ -685,7 +705,7 @@ class PickService(BaseService):
         year: int,
         token: DecodedToken,
         reason: str | None = None,
-    ) -> PickStatus:
+    ) -> SubmitPicksResponseDto:
         """
         Put a week back the way an override found it.
 
@@ -729,7 +749,7 @@ class PickService(BaseService):
             # The week had nothing in it. Restoring that means removing what the
             # override put there, which is not a slate write at all -- there is
             # nothing to write.
-            return self._clear_week(
+            pick_status = self._clear_week(
                 user=target,
                 league_season=league_season,
                 year=year,
@@ -737,28 +757,32 @@ class PickService(BaseService):
                 actor=actor,
                 reason=restore_reason,
             )
+        else:
+            pick_status = self._write_week(
+                pick_data=SubmitPicksRequestDto(
+                    year=year,
+                    week=record.week_number,
+                    picks=[
+                        PickRequest(
+                            game_id=slot["gameId"],
+                            team_id=slot["teamId"],
+                            spread_value=slot["spreadValue"],
+                            confidence=slot["confidence"],
+                        )
+                        for slot in before
+                    ],
+                ),
+                user=target,
+                league_season=league_season,
+                actor=actor,
+                # A revert almost always reaches games that have been played --
+                # that is usually why it is being reverted.
+                override_locked=True,
+                reason=restore_reason,
+            )
 
-        return self._write_week(
-            pick_data=SubmitPicksRequestDto(
-                year=year,
-                week=record.week_number,
-                picks=[
-                    PickRequest(
-                        game_id=slot["gameId"],
-                        team_id=slot["teamId"],
-                        spread_value=slot["spreadValue"],
-                        confidence=slot["confidence"],
-                    )
-                    for slot in before
-                ],
-            ),
-            user=target,
-            league_season=league_season,
-            actor=actor,
-            # A revert almost always reaches games that have been played --
-            # that is usually why it is being reverted.
-            override_locked=True,
-            reason=restore_reason,
+        return SubmitPicksResponseDto(
+            status=pick_status, detail=f"Override {override_id} reverted."
         )
 
     def _clear_week(
@@ -839,6 +863,17 @@ class PickService(BaseService):
         except DoesNotExist:
             self.logger.error(f"User '{username}' not found")
             raise UserNotFoundException(username=username)
+
+    def get_own_picks_for_week(
+        self, username: str, year: int, week_number: int, league_id: int
+    ) -> UserPicksDto:
+        """The caller's own week. The route has already checked league membership."""
+        return self.get_user_picks_for_week(
+            self._get_user(username),
+            year,
+            week_number,
+            league_id=league_id,
+        )
 
     def get_player_picks_for_week(
         self, username: str, year: int, week_number: int, league_id: int

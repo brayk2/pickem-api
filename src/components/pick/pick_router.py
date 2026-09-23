@@ -4,7 +4,6 @@ from starlette import status
 from src.security.security_models import DecodedToken
 from src.security.permission_checker import PermissionChecker
 from src.components.league.league_permission import LeaguePermission
-from src.components.pick.pick_exceptions import PathBodyMismatchException
 from src.components.pick.pick_models import (
     AdminSubmitPicksRequestDto,
     PickOverrideDto,
@@ -13,7 +12,6 @@ from src.components.pick.pick_models import (
     SubmitPicksResponseDto,
     UserPicksDto,
 )
-from src.models.db_models import UserModel
 from src.components.pick.pick_service import PickService
 
 picks_router = APIRouter(
@@ -41,11 +39,9 @@ async def submit_picks(
     decoded_token: DecodedToken = Depends(PermissionChecker.authenticated),
     pick_service: PickService = Depends(PickService.create),
 ):
-    user = UserModel.get(username=decoded_token.sub)
-    pick_status = await pick_service.submit_picks(
-        pick_data, user, league_id=league_id, token=decoded_token
+    return await pick_service.submit_picks(
+        pick_data, league_id=league_id, token=decoded_token
     )
-    return {"detail": "Picks submitted successfully.", "status": pick_status}
 
 
 @picks_router.get(
@@ -89,17 +85,13 @@ async def revert_override(
     edited cannot answer the question it exists for, and the entry most likely
     to be removed is the one somebody most wants gone.
     """
-    pick_status = await pick_service.revert_override(
+    return await pick_service.revert_override(
         override_id=override_id,
         league_id=league_id,
         year=year,
         token=token,
         reason=request.reason if request else None,
     )
-    return {
-        "detail": f"Override {override_id} reverted.",
-        "status": pick_status,
-    }
 
 
 @picks_router.get(
@@ -132,11 +124,12 @@ async def get_user_picks_for_week(
     decoded_token: DecodedToken = Depends(LeaguePermission.league_member),
     pick_service: PickService = Depends(PickService.create),
 ):
-    user = UserModel.get(username=decoded_token.sub)
-    user_picks = pick_service.get_user_picks_for_week(
-        user, year, week_number, league_id=league_id
+    return pick_service.get_own_picks_for_week(
+        username=decoded_token.sub,
+        year=year,
+        week_number=week_number,
+        league_id=league_id,
     )
-    return user_picks
 
 
 @picks_router.get(
@@ -194,16 +187,11 @@ async def override_player_picks(
     rejected rather than quietly believed, since the path is what the caller
     navigated to and saw.
     """
-    if pick_data.year != year or pick_data.week != week_number:
-        raise PathBodyMismatchException(
-            path=f"{year} week {week_number}",
-            body=f"{pick_data.year} week {pick_data.week}",
-        )
-
-    pick_status = await pick_service.override_picks(
-        pick_data, username=username, league_id=league_id, token=token
+    return await pick_service.override_picks(
+        pick_data,
+        username=username,
+        league_id=league_id,
+        year=year,
+        week_number=week_number,
+        token=token,
     )
-    return {
-        "detail": f"Picks replaced for {username}.",
-        "status": pick_status,
-    }

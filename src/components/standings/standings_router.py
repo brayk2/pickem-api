@@ -6,7 +6,6 @@ from src.components.standings.standings_service import StandingsService
 
 
 standings_router = APIRouter(prefix="/standings", tags=["Standings"])
-standings_service = StandingsService()
 
 
 @standings_router.get("/{league_id}/{year}/{week}/history", response_model=StandingsHistoryDto)
@@ -15,7 +14,7 @@ async def get_standings_history(
     year: int,
     week: int,
     _: DecodedToken = Depends(LeaguePermission.league_member),
-    # standings_service: StandingsService = Depends(StandingsService.create),
+    standings_service: StandingsService = Depends(StandingsService.create),
 ):
     return await standings_service.get_standings_history(
         year, week, league_id=league_id
@@ -36,7 +35,7 @@ async def get_standings(
     year: int = Path(description="The year of the NFL season."),
     week: int = Path(description="The week number within the NFL season."),
     _: DecodedToken = Depends(LeaguePermission.league_member),
-    # service: StandingsService = Depends(StandingsService.create),
+    standings_service: StandingsService = Depends(StandingsService.create),
 ):
     """
     Retrieve the standings for a specific week in a given year.

@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends
 from starlette import status
-from starlette.responses import JSONResponse
 
 from src.security.security_models import TokenResponse
 from src.components.auth.auth_models import (
@@ -12,11 +11,7 @@ from src.components.auth.auth_models import (
     PasswordResetConfirmResponse,
     PasswordResetConfirmBody,
 )
-from src.security.security_exceptions import IncorrectCredentialsException
-from src.components.league.league_service import LeagueService
-from src.components.roles.roles_service import RolesService
-from src.security.oauth_service import OAuthService
-from src.components.user.user_service import UserService
+from src.components.auth.auth_service import AuthService
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -24,54 +19,17 @@ auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 @auth_router.post("/token", response_model=TokenResponse)
 async def login_for_access_token(
     form_data: LoginRequest,
-    oauth_service: OAuthService = Depends(OAuthService.create),
-    user_service: UserService = Depends(UserService.create),
-    roles_service: RolesService = Depends(RolesService.create),
-    league_service: LeagueService = Depends(LeagueService.create),
+    auth_service: AuthService = Depends(AuthService.create),
 ):
-    # Validate user credentials
-    user = user_service.get_user_by_username(form_data.username)
-    if not user or not oauth_service.verify_password(
-        form_data.password, user.password_hash
-    ):
-        raise IncorrectCredentialsException()
-
-    # Get global roles and per-league standing for the user
-    roles = roles_service.get_roles_for_user(user=user)
-    leagues = league_service.get_league_claims(user=user)
-
-    # Use OAuthService to generate tokens, including roles and league claims
-    tokens = oauth_service.generate_tokens(
-        username=user.username, roles=roles, leagues=leagues
-    )
-
-    return tokens
+    return auth_service.login(username=form_data.username, password=form_data.password)
 
 
 @auth_router.post("/token/refresh", response_model=TokenResponse)
 async def refresh_access_token(
     token_refresh_request: TokenRefreshRequest,
-    user_service: UserService = Depends(UserService.create),
-    oauth_service: OAuthService = Depends(OAuthService.create),
-    roles_service: RolesService = Depends(RolesService.create),
-    league_service: LeagueService = Depends(LeagueService.create),
+    auth_service: AuthService = Depends(AuthService.create),
 ):
-    # Decode the token
-    decoded_token = oauth_service.decode_token(token_refresh_request.refresh_token)
-
-    # Re-read roles and league standing so a refresh picks up roster changes
-    user = user_service.get_user_by_username(decoded_token.sub)
-    roles = roles_service.get_roles_for_user(user)
-    leagues = league_service.get_league_claims(user=user)
-
-    # Generate new tokens
-    tokens = oauth_service.generate_tokens(
-        username=decoded_token.sub,
-        roles=roles,
-        leagues=leagues,
-    )
-
-    return tokens
+    return auth_service.refresh(refresh_token=token_refresh_request.refresh_token)
 
 
 @auth_router.post(

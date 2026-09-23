@@ -100,6 +100,9 @@ class ResultsStatsService(BaseService):
     async def get_week_stats(
         self, year: int, week: int, league_id: int
     ) -> WeekStatsDto:
+        self.logger.info(
+            f"Getting week stats for league {league_id}, {year} week {week}"
+        )
         if not self.week_service.is_complete(year=year, week=week):
             self.logger.info(
                 f"Week {week} of {year} is not complete; withholding week stats"

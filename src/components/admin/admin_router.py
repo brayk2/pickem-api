@@ -1,14 +1,8 @@
 from fastapi import APIRouter, Depends, Query
-from playhouse.shortcuts import model_to_dict
 
-from src.components.admin.admin_exceptions import (
-    PropertyNotFoundException,
-)
 from src.components.admin.admin_service import AdminService, PaginationOptions
 from src.security.security_models import DecodedToken
 from src.security.permission_checker import PermissionChecker
-from src.config.logger import Logger
-from src.components.admin.admin_models import CreateActionRequest
 from src.components.admin.admin_models import ApiQuota
 from src.components.admin.admin_models import CreateGroupRequest, CreateGroupResponse
 from src.components.week.week_models import (
@@ -16,7 +10,6 @@ from src.components.week.week_models import (
     WeekCompletionDto,
 )
 from src.components.week.week_service import WeekService
-from src.models.db_models import GameModel, SpreadModel, GroupModel
 
 admin_router = APIRouter(
     prefix="/admin", tags=["Admin"], dependencies=[Depends(PermissionChecker.admin)]
@@ -25,25 +18,22 @@ admin_router = APIRouter(
 
 @admin_router.post("/group", response_model=CreateGroupResponse)
 async def create_group(
-    request: CreateGroupRequest, _: DecodedToken = Depends(PermissionChecker.admin)
+    request: CreateGroupRequest,
+    admin_service: AdminService = Depends(AdminService.create),
+    _: DecodedToken = Depends(PermissionChecker.admin),
 ):
-    model = GroupModel.create(name=request.name, description=request.description)
-    return model_to_dict(model)
+    return admin_service.create_group(
+        name=request.name, description=request.description
+    )
 
 
 @admin_router.get("/api-quota", response_model=ApiQuota)
 async def get_quota(
     admin_service: AdminService = Depends(AdminService.create),
     _: DecodedToken = Depends(PermissionChecker.admin),
-    # logger: Logger = Depends(Logger),
 ):
     """Gets the odds API quota."""
-    try:
-        model = admin_service.get_oddsapi_quota()
-        return model_to_dict(model).get("value")
-    except Exception as e:
-        # logger.error(f"Error fetching API quota: {e}")
-        raise PropertyNotFoundException("Error fetching API quota", category="api")
+    return admin_service.get_api_quota()
 
 
 @admin_router.get("/weeks")

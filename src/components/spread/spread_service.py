@@ -122,6 +122,9 @@ class SpreadService(BaseService):
                         )
 
     async def get_matchup_data(self, year: int, week: int, bookmaker: str):
+        self.logger.info(
+            f"Getting matchup data for year {year}, week {week}, bookmaker {bookmaker}"
+        )
         # define aliased
         home_team_alias = TeamModel.alias("home_team")
         away_team_alias = TeamModel.alias("away_team")
