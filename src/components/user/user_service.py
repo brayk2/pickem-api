@@ -1,7 +1,7 @@
 from peewee import DoesNotExist, IntegrityError
 from src.security.security_models import DecodedToken
 from src.security.security_exceptions import InvalidTokenException
-from src.components.email.email_service import EmailService
+from src.components.email.email_models import EmailMessage
 from src.components.roles.roles_service import RolesService
 from src.components.user.password_generator import gen_pass
 from src.components.user.user_exceptions import (
@@ -15,6 +15,7 @@ from src.components.user.user_models import (
     UpdateUserRequest,
 )
 from src.config.base_service import BaseService
+from src.integrations.queue_service import QueueService
 from src.models.db_models import UserModel
 from src.security.oauth_service import OAuthService
 from src.util.injection import dependency, inject
@@ -31,7 +32,7 @@ class UserService(BaseService):
         self,
         roles_service: RolesService,
         oauth_service: OAuthService,
-        email_service: EmailService,
+        queue_service: QueueService,
     ):
         """
         UserService constructor.
@@ -40,7 +41,7 @@ class UserService(BaseService):
         """
         self.roles_service = roles_service
         self.oauth_service = oauth_service
-        self.email_service = email_service
+        self.queue_service = queue_service
 
     def get_user_by_username(self, username: str) -> UserModel | None:
         """
@@ -51,14 +52,29 @@ class UserService(BaseService):
         """
         self.logger.info(f"Fetching user by username: {username}")
         try:
-            # q = UserModel.select().where(UserModel.username == username)
-            # self.logger.info(f"q = {q}")
-            # user = q.execute()
             user = UserModel.get(username=username)
             self.logger.info(f"User '{username}' found.")
             return user
         except DoesNotExist:
             self.logger.error(f"Failed to find user: {username}")
+            return None
+        except Exception as e:
+            raise e
+
+    def get_user_by_email(self, email: str) -> UserModel | None:
+        """
+        Fetches a user by their email address.
+
+        :param email: The email address to search for.
+        :return: UserModel instance if found, None otherwise.
+        """
+        self.logger.info(f"Fetching user by email: {email}")
+        try:
+            user = UserModel.get(email=email)
+            self.logger.info(f"User '{email}' found.")
+            return user
+        except DoesNotExist:
+            self.logger.error(f"Failed to find user: {email}")
             return None
         except Exception as e:
             raise e
@@ -124,6 +140,24 @@ class UserService(BaseService):
 
         self.logger.info(f"User '{username}' created successfully.")
         return user
+
+    def invite_user(
+        self, first_name: str, last_name: str, username: str, email: str
+    ) -> dict:
+        """
+        Creates a user with a generated password and emails them their login.
+
+        :return: A message naming who was notified and where.
+        """
+        password = gen_pass()
+        user = self.create_user(
+            first_name=first_name,
+            last_name=last_name,
+            username=username,
+            email=email,
+            password_hash=self.oauth_service.get_password_hash(password=password),
+        )
+        return self.notify_password(user=user, password=password)
 
     def delete_user(self, username: str) -> None:
         """
@@ -277,15 +311,17 @@ class UserService(BaseService):
             {"content": body, "subtype": "plain"},
         ]
 
-        self.email_service.send_email(
-            recipient=user.email,
-            subject=subject,
-            message_parts=message_parts,
-            sender_email="pickem@gmail.com",  # optional override, otherwise defaults to creds.login
+        self.queue_service.send_email(
+            EmailMessage(
+                recipient=user.email,
+                subject=subject,
+                message_parts=message_parts,
+                sender_email="pickem@gmail.com",  # optional override, otherwise defaults to creds.login
+            )
         )
 
         return {
-            "message": f"Login details sent to user {user.username} at email address: {user.email}."
+            "message": f"Login details for user {user.username} queued for delivery to {user.email}."
         }
 
     def reset_password(self, username: str) -> dict:

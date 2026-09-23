@@ -3,11 +3,16 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from src.config.base_service import BaseService
-from src.components.admin.admin_models import CreateActionRequest, ActionType
+from src.components.admin.admin_exceptions import PropertyNotFoundException
+from src.components.admin.admin_models import (
+    CreateActionRequest,
+    ActionType,
+    CreateGroupResponse,
+)
 from src.components.week.week_models import WeekDto
 from src.util.injection import dependency, inject
 from src.components.property.property_service import PropertyService
-from src.models.db_models import PropertyModel, WeekModel, SeasonModel
+from src.models.db_models import GroupModel, PropertyModel, WeekModel, SeasonModel
 
 
 class PaginationOptions(BaseModel):
@@ -28,6 +33,13 @@ class AdminService(BaseService):
         """
         self.property_service = property_service
 
+    def create_group(self, name: str, description: str) -> CreateGroupResponse:
+        self.logger.info(f"Creating group: {name}")
+        group = GroupModel.create(name=name, description=description)
+        return CreateGroupResponse(
+            id=group.id, name=group.name, description=group.description
+        )
+
     def get_oddsapi_quota(self) -> PropertyModel:
         """
         Retrieves the odds API quota from the property table.
@@ -41,6 +53,17 @@ class AdminService(BaseService):
         else:
             self.logger.warning("Odds API quota not found.")
         return prop
+
+    def get_api_quota(self) -> dict:
+        """
+        The odds API quota as stored, `{"used": ..., "remaining": ...}`.
+
+        :raises PropertyNotFoundException: If the quota has never been recorded.
+        """
+        prop = self.get_oddsapi_quota()
+        if not prop:
+            raise PropertyNotFoundException(key="odds-api", category="api")
+        return prop.value
 
     def set_oddsapi_quota(self, quota: dict) -> PropertyModel:
         """

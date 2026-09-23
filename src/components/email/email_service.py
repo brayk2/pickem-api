@@ -1,13 +1,26 @@
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import logging
-import os
+
+from jinja2 import Environment, PackageLoader, StrictUndefined, select_autoescape
 
 from src.config.base_service import BaseService
 from src.config.logger import Logger
 from src.integrations.secret_service import SecretService
 from src.util.injection import dependency, inject
+
+# Templates live in ./templates as <name>.html + <name>.txt pairs, and inherit
+# from base.html. Loaded through the package rather than a filesystem path so
+# they resolve the same locally, in the Docker image and in the Lambda zip.
+_templates = Environment(
+    loader=PackageLoader("src.components.email", "templates"),
+    # User-supplied values (names, emails) are escaped in HTML, never in text.
+    autoescape=select_autoescape(["html"]),
+    # A misspelled variable fails the render instead of sending a blank.
+    undefined=StrictUndefined,
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
 
 
 @dependency
@@ -32,6 +45,30 @@ class EmailService(BaseService):
         self.use_tls = use_tls
         self.logger = logger
 
+    @staticmethod
+    def render_template(template: str, **context) -> list[dict]:
+        """
+        Renders a template pair into message parts for send_email.
+
+        Render once and reuse the parts when the same email goes to many people.
+
+        :param template: The template name, without extension -- e.g.
+            "password_reset" renders password_reset.txt and password_reset.html.
+        :param context: The variables the template expects.
+        """
+        return [
+            {
+                "content": _templates.get_template(f"{template}.txt").render(**context),
+                "subtype": "plain",
+            },
+            {
+                "content": _templates.get_template(f"{template}.html").render(
+                    **context
+                ),
+                "subtype": "html",
+            },
+        ]
+
     def send_email(self, recipient, subject, message_parts, sender_email=None):
         """
         Sends an email with the specified message parts.
@@ -39,15 +76,16 @@ class EmailService(BaseService):
         Parameters:
         - recipient (str): The recipient's email address.
         - subject (str): The email subject.
-        - message_parts (list of dict): A list of message parts in the order they should appear.
+        - message_parts (list of dict): Alternative versions of the same message,
+            least preferred first -- plain text, then HTML. The client shows the
+            last one it can render, not all of them.
             Each part is a dict with 'content' and 'subtype' keys.
-            'subtype' can be 'plain', 'html', etc.
         - sender_email (str, optional): The sender's email address. Defaults to the login email.
         """
         sender_email = sender_email or self.login
 
-        # Create a MIMEMultipart message
-        message = MIMEMultipart()
+        # "alternative" so a client shows the HTML or the text, not both stacked
+        message = MIMEMultipart("alternative")
         message["From"] = sender_email
         message["To"] = recipient
         message["Subject"] = subject

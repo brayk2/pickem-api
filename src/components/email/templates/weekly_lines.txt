@@ -1,0 +1,18 @@
+{#- Context: see weekly_lines.html -#}
+Here are the lines for week {{ week }}. Away team listed first; lines from DraftKings.
+{% for day in days %}
+
+{{ day.label | upper }}
+{% for game in day.games %}
+  {{ "%-28s" | format(game.away.name) }} {{ game.away.line or "-" }}
+  {{ "%-28s" | format("@ " ~ game.home.name) }} {{ game.home.line or "-" }}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+{% endfor %}
+
+Make your picks: {{ picks_url }}
+
+Lines can move before kickoff.
+- PickEm

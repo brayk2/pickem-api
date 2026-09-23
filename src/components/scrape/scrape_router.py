@@ -1,15 +1,8 @@
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
 
 from src.security.permission_checker import PermissionChecker
-
-from src.components.scrape.scrapers.espn_scraper import EspnScraper
-from src.components.scrape.scrapers.nfl_scraper import NflScraper
-from src.components.scrape.scrapers.pfr_scraper import PfrScraper
-
-pfr_scraper = PfrScraper()
-espn_scraper = EspnScraper()
-nfl_scraper = NflScraper()
+from src.components.scrape.scrape_models import GenericResponse
+from src.components.scrape.scrape_service import ScrapeService
 
 # These write to the database (teams, schedules, thumbnails), so they are
 # admin-only rather than open to anyone who knows the path.
@@ -20,42 +13,21 @@ scrape_router = APIRouter(
 )
 
 
-class GenericResponse(BaseModel):
-    error: bool
-    message: str
-
-
 @scrape_router.post("/teams", response_model=GenericResponse)
-async def scape_teams():
-    try:
-        pfr_scraper.scrape_teams()
-        return {
-            "error": False,
-            "message": f"Successfully scraped teams from {pfr_scraper.base_url}",
-        }
-    except Exception as e:
-        return {"error": True, "message": f"Failed to scrape teams: {e}"}
+async def scape_teams(scrape_service: ScrapeService = Depends(ScrapeService.create)):
+    return scrape_service.scrape_teams()
 
 
 @scrape_router.post("/schedule", response_model=GenericResponse)
-async def scape_schedule(year: int = Query(default=2024)):
-    try:
-        espn_scraper.scrape_season(year=year)
-        return {
-            "error": False,
-            "message": f"Successfully scraped schedule from {espn_scraper.base_url}",
-        }
-    except Exception as e:
-        return {"error": True, "message": f"Failed to scrape schedule: {e}"}
+async def scape_schedule(
+    year: int = Query(default=2024),
+    scrape_service: ScrapeService = Depends(ScrapeService.create),
+):
+    return scrape_service.scrape_schedule(year=year)
 
 
 @scrape_router.post("/thumbnails", response_model=GenericResponse)
-async def scape_thumbnails():
-    try:
-        nfl_scraper.scrape_thumbnails()
-        return {
-            "error": False,
-            "message": f"Successfully scraped thumbnails from {nfl_scraper.base_url}",
-        }
-    except Exception as e:
-        return {"error": True, "message": f"Failed to scrape thumbnails: {e}"}
+async def scape_thumbnails(
+    scrape_service: ScrapeService = Depends(ScrapeService.create),
+):
+    return scrape_service.scrape_thumbnails()

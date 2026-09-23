@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pickem-api"
-version = "0.0.17"
+version = "0.0.18"
 description = "PickEm API"
 authors = ["Brayden Kness <brayk2@gmail.com>"]
 readme = "README.md"
@@ -26,9 +26,9 @@ python-jose = "^3.3.0"
 strenum = "^0.4.15"
 pydantic = {extras = ["email"], version = "^2.8.2"}
 pydantic-settings = "^2.4.0"
+jinja2 = "^3.1.4"
 
 [tool.poetry.group.dev.dependencies]
-jinja2 = "^3.1.4"
 boto3 = "^1.35.4"
 
 [build-system]

@@ -1,58 +1,105 @@
 import asyncio
+from itertools import groupby
 
+from src.components.email.email_models import EmailMessage
 from src.components.email.email_service import EmailService
-from src.components.email.utils import generate_html_table
+from src.integrations.queue_service import QueueService
+from src.components.results.results_models import MatchupDto, TeamDto
 from src.components.season.season_service import SeasonService
 from src.models.db_models import UserModel
 from src.components.spread.spread_service import SpreadService
+
+
+def _format_line(line: str | None) -> str | None:
+    if line is None:
+        return None
+    value = float(line)
+    if value == 0:
+        return "PK"
+    return line if value < 0 else f"+{line}"
+
+
+def _side(team: TeamDto, lines: dict) -> dict:
+    line = lines.get(team.team_name)
+    return {
+        "name": f"{team.team_city} {team.team_name}",
+        "line": _format_line(line),
+        "favorite": line is not None and float(line) < 0,
+    }
+
+
+def _days(matchups: list[MatchupDto]) -> list[dict]:
+    """Games grouped under a heading per kickoff day, in kickoff order."""
+    ordered = sorted(
+        matchups,
+        key=lambda m: (
+            m.start_date is None,
+            m.start_date,
+            m.start_time is None,
+            m.start_time,
+        ),
+    )
+    return [
+        {
+            "label": day.strftime("%A, %B %-d") if day else "Date TBD",
+            "games": [
+                {
+                    "away": _side(m.away_team, m.lines or {}),
+                    "home": _side(m.home_team, m.lines or {}),
+                }
+                for m in games
+            ],
+        }
+        for day, games in groupby(ordered, key=lambda m: m.start_date)
+    ]
 
 
 async def read_and_notify():
     spread_service = SpreadService()
     season_service = SeasonService()
     week_info = season_service.get_current_week_and_year()
+    year, week = week_info.get("year"), week_info.get("week")
 
-    spreads = await spread_service.get_matchup_data(
-        year=week_info.get("year"), week=week_info.get("week"), bookmaker="DraftKings"
+    matchups = await spread_service.get_matchup_data(
+        year=year, week=week, bookmaker="DraftKings"
     )
 
-    lines = [
-        {
-            key: str(val) if float(val) < 0 else f"+{val}"
-            for key, val in spread.lines.items()
-        }
-        for spread in spreads
-    ]
-    table = generate_html_table(data=lines)
+    subject = f"Pickem Lines | Week {week}"
 
-    email_service = EmailService()
-    subject = f"Pickem Lines | Week {week_info.get('week')}"
+    # Same email for everyone, so render it once. render_template is static:
+    # no EmailService instance, so no SMTP credentials fetched here -- the
+    # send_email lambda does the sending.
+    message_parts = EmailService.render_template(
+        "weekly_lines",
+        year=year,
+        week=week,
+        days=_days(matchups),
+        picks_url=f"https://pickem-webapp.vercel.app/picks/{year}/{week}",
+    )
 
-    intro = f"Here are the lines for week {week_info.get('week')}:\n\n"
-    outro = f"\n\nMake your picks at https://pickem-webapp.vercel.app/picks/{week_info.get('year')}/{week_info.get('week')}"
-
-    # Prepare message parts
-    message_parts = [
-        {"content": intro, "subtype": "plain"},
-        {"content": table, "subtype": "html"},
-        {"content": outro, "subtype": "plain"},
-    ]
-
+    queue_service = QueueService()
     messages = []
     for user in UserModel.select():
         try:
-            email_service.send_email(
-                recipient=user.email, subject=subject, message_parts=message_parts
+            queue_service.send_email(
+                EmailMessage(
+                    recipient=user.email,
+                    subject=subject,
+                    message_parts=message_parts,
+                )
             )
             messages.append(
                 {
-                    "message": f"Successfully sent lines to {user.email}",
-                    "status": "success",
+                    "message": f"Queued lines for {user.email}",
+                    "status": "queued",
                 }
             )
         except Exception:
             messages.append(
-                {"message": f"failed to send email to {user.email}", "status": "failed"}
+                {
+                    "message": f"failed to queue email to {user.email}",
+                    "status": "failed",
+                }
             )
     return messages
 

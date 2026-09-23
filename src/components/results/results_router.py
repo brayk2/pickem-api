@@ -1,4 +1,3 @@
-import logging
 from fastapi import APIRouter, Depends, Query
 
 from src.security.security_models import DecodedToken
@@ -6,15 +5,12 @@ from src.security.permission_checker import PermissionChecker
 from src.components.league.league_permission import LeaguePermission
 from src.components.results.results_models import (
     UserPickResultsDto,
-    LeaguePickResultsDto,
-    GameResultDto,
     MatchupDto,
     WeekResultsDto,
 )
 from src.components.results.results_service import ResultsService
 from src.components.results.results_stats_models import WeekStatsDto
 from src.components.results.results_stats_service import ResultsStatsService
-from src.config.logger import Logger
 from src.components.spread.spread_service import SpreadService
 
 results_router = APIRouter(
@@ -29,15 +25,11 @@ async def get_user_pick_results(
     year: int,
     week: int,
     results_service: ResultsService = Depends(ResultsService.create),
-    logger: Logger = Depends(Logger),
     token: DecodedToken = Depends(LeaguePermission.league_member),
 ):
-    logger.info(f"Getting user pick results for year {year} and week {week}")
-    if picks := await results_service.get_user_pick_results(
-        year, week, league_id=league_id, user=token.sub
-    ):
-        return picks[0]
-    return UserPickResultsDto(username=token.sub, picks=[], total_score=0, rank=None)
+    return await results_service.get_user_week_results(
+        year, week, league_id=league_id, username=token.sub
+    )
 
 
 @results_router.get("/{league_id}/{year}/user-picks", response_model=UserPickResultsDto)
@@ -45,7 +37,6 @@ async def get_season_user_pick_results(
     league_id: int,
     year: int,
     results_service: ResultsService = Depends(ResultsService.create),
-    logger: Logger = Depends(Logger),
     token: DecodedToken = Depends(LeaguePermission.league_member),
 ):
     """
@@ -60,14 +51,9 @@ async def get_season_user_pick_results(
     player, with nobody to rank them against -- returning the 1 that ranking a
     single-row result produces would read as a league position.
     """
-    logger.info(f"Getting season pick results for league {league_id}, {year}")
-    if results := await results_service.get_season_pick_results(
-        year, league_id=league_id, user=token.sub
-    ):
-        season = results[0]
-        season.rank = None
-        return season
-    return UserPickResultsDto(username=token.sub, picks=[], total_score=0, rank=None)
+    return await results_service.get_user_season_results(
+        year, league_id=league_id, username=token.sub
+    )
 
 
 @results_router.get("/{league_id}/{year}/{week}/history", response_model=list[WeekResultsDto])
@@ -77,9 +63,7 @@ async def get_user_pick_history(
     week: int,
     _: DecodedToken = Depends(LeaguePermission.league_member),
     results_service: ResultsService = Depends(ResultsService.create),
-    logger: Logger = Depends(Logger),
 ):
-    logger.info(f"Getting user pick results for year {year} and week {week}")
     return await results_service.get_pick_history_for_year(
         year, week, league_id=league_id
     )
@@ -94,8 +78,7 @@ async def get_league_pick_results(
     year: int,
     week: int,
     results_service: ResultsService = Depends(ResultsService.create),
-    token: DecodedToken = Depends(LeaguePermission.league_member),
-    logger: Logger = Depends(Logger),
+    _: DecodedToken = Depends(LeaguePermission.league_member),
 ):
     """
     The week's table, with a row for every player on the season's roster.
@@ -107,7 +90,6 @@ async def get_league_pick_results(
     to see that somebody has their 5 and their 3 in, or that somebody has
     nothing in; never enough to see what they took.
     """
-    logger.info(f"Getting league pick results for year {year} and week {week}")
     return await results_service.get_league_week_results(
         year, week, league_id=league_id
     )
@@ -120,7 +102,6 @@ async def get_week_stats(
     week: int,
     stats_service: ResultsStatsService = Depends(ResultsStatsService.create),
     _: DecodedToken = Depends(LeaguePermission.league_member),
-    logger: Logger = Depends(Logger),
 ):
     """
     End-of-week statistics for the league: how it split on each game, which
@@ -130,7 +111,6 @@ async def get_week_stats(
     the page can hold the panel back rather than showing numbers that will
     change once the last game is scored.
     """
-    logger.info(f"Getting week stats for league {league_id}, {year} week {week}")
     return await stats_service.get_week_stats(year=year, week=week, league_id=league_id)
 
 
@@ -144,12 +124,7 @@ async def get_nfl_game_results(
         default=10, ge=1, le=100, description="Number of results per page"
     ),
     spread_service: SpreadService = Depends(SpreadService.create),
-    logger: Logger = Depends(Logger),
 ):
-    logger.info(
-        f"Getting NFL game results for year {year} and week {week}, page {page}, page_size {page_size}"
-    )
-    x = await spread_service.get_matchup_data(
+    return await spread_service.get_matchup_data(
         year=year, week=week, bookmaker="DraftKings"
     )
-    return x

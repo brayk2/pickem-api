@@ -2,8 +2,6 @@ from fastapi import APIRouter, Depends, status
 
 from src.security.security_models import DecodedToken
 from src.security.permission_checker import PermissionChecker
-from src.components.email.email_service import EmailService
-from src.components.user.password_generator import gen_pass
 from src.components.user.user_models import (
     CreateUserDto,
     AddRoleDto,
@@ -40,22 +38,14 @@ user_router = APIRouter(
 async def create_user(
     user_data: CreateUserDto,
     user_service: UserService = Depends(UserService.create),
-    oauth_service: OAuthService = Depends(OAuthService.create),
     _: DecodedToken = Depends(PermissionChecker.admin),
 ):
-    # generate a password
-    password = gen_pass()
-
-    # create user
-    user = user_service.create_user(
+    return user_service.invite_user(
         first_name=user_data.first_name,
         last_name=user_data.last_name,
         username=user_data.username,
         email=user_data.email,
-        password_hash=oauth_service.get_password_hash(password=password),
     )
-
-    return user_service.notify_password(user=user, password=password)
 
 
 @user_router.post("/{username}/reset-password", status_code=status.HTTP_200_OK)
