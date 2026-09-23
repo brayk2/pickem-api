@@ -1,0 +1,46 @@
+{#-
+  Context:
+    year, week, picks_url
+    days: [{label, games: [{away: side, home: side}]}]
+      side: {name, line, favorite}  -- line is display-ready ("-3.5", "+3.5", "PK", or none)
+-#}
+{% extends "base.html" %}
+{% from "_macros.html" import button %}
+
+{% block title %}PickEm lines for week {{ week }}{% endblock %}
+{% block preheader %}The lines for week {{ week }} are in. Get your picks in before kickoff.{% endblock %}
+{% block max_width %}560px{% endblock %}
+{% block heading %}Week {{ week }} lines{% endblock %}
+
+{% macro side_cells(side, prefix="") -%}
+<td style="padding:8px 0;font-size:14px;{% if side.favorite %}font-weight:600;{% endif %}">{% if prefix %}<span style="color:#7b8794;font-weight:400;">{{ prefix }}</span> {% endif %}{{ side.name }}</td>
+<td align="right" style="padding:8px 0 8px 12px;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;{% if side.favorite %}font-weight:600;{% else %}color:#52606d;{% endif %}">{{ side.line or "&mdash;"|safe }}</td>
+{%- endmacro %}
+
+{% block content %}
+<p style="margin:0 0 20px 0;">Here are the lines for week {{ week }}. Favorites are in bold.</p>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+  {% for day in days %}
+  <tr>
+    <td colspan="2" style="padding:{% if not loop.first %}20px{% else %}0{% endif %} 0 6px 0;border-bottom:2px solid #1f2933;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#52606d;">{{ day.label }}</td>
+  </tr>
+  {% for game in day.games %}
+  <tr>
+    <td colspan="2" style="padding:0;border-bottom:1px solid #e4e7eb;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>{{ side_cells(game.away) }}</tr>
+        <tr>{{ side_cells(game.home, "@") }}</tr>
+      </table>
+    </td>
+  </tr>
+  {% endfor %}
+  {% endfor %}
+</table>
+
+<p style="margin:12px 0 28px 0;font-size:12px;color:#7b8794;">Away team listed first. Lines from DraftKings.</p>
+
+{{ button(picks_url, "Make your picks") }}
+{% endblock %}
+
+{% block footer %}Lines can move before kickoff. You're receiving this because you're a PickEm player.{% endblock %}

@@ -31,6 +31,4 @@ class Settings(BaseSettings):
     db_name: str
     aws_env: str
     scheduler_group: str
-    # db_user: str = os.getenv("user", "_")
-    # db_pass: str = os.getenv("password", "_")
-    # odds_api_key: str = os.getenv("odds_api_key", "_")
+    email_queue: str
