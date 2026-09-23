@@ -9,6 +9,7 @@ on:
 env:
   AWS_BUCKET: "pickem-api"
   AWS_LAMBDA: "pickem-api"
+  EMAIL_HANDLER_LAMBDA: "pickem-email-handler"
 
 permissions:
   id-token: write
@@ -97,13 +98,31 @@ jobs:
           poetry run pip install --upgrade --target package dist/*.whl
           cd package && zip -r ../${{ env.artifact_name }} . -x '*.pyc'
 
+      # The email handler (src/lambdas/send_email.py) only needs pydantic,
+      # pydantic-settings and jinja2 -- boto3 comes with the Lambda runtime.
+      # The full package is over Lambda's 250 MB limit for a separate function,
+      # so it gets its own, pinned to the versions just installed above.
+      # If send_email.py grows a new third-party import, add it here.
+      - name: 'Create Email Handler Package'
+        id: create_email_handler_package
+        run: |
+          poetry run pip list --path package --format=freeze > package-constraints.txt
+          poetry run pip install --target email_package --no-deps dist/*.whl
+          poetry run pip install --target email_package -c package-constraints.txt \
+            pydantic pydantic-settings jinja2
+          cd email_package && zip -r ../email-handler.zip . -x '*.pyc'
+
       - name: 'Upload to S3'
-        run: aws s3 cp ${{ env.artifact_name }} s3://${{ env.AWS_BUCKET }}/
+        run: |
+          aws s3 cp ${{ env.artifact_name }} s3://${{ env.AWS_BUCKET }}/
+          aws s3 cp email-handler.zip s3://${{ env.AWS_BUCKET }}/email-handler/${{ env.artifact_name }}
 
       - name: 'Add Tags to S3 Object'
         run: |
-          aws s3api put-object-tagging --bucket ${{ env.AWS_BUCKET }} --key ${{ env.artifact_name }} \
-            --tagging '{"TagSet":[{"Key":"version","Value":"${{ env.artifact_tag }}"}]}'
+          for key in "${{ env.artifact_name }}" "email-handler/${{ env.artifact_name }}"; do
+            aws s3api put-object-tagging --bucket ${{ env.AWS_BUCKET }} --key "${key}" \
+              --tagging '{"TagSet":[{"Key":"version","Value":"${{ env.artifact_tag }}"}]}'
+          done
   Deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -130,15 +149,18 @@ jobs:
         run: |
           branch_name=$(echo "${{ github.ref }}" | sed 's|refs/heads/||')
 
-          # Set lambda function name based on branch
+          # Set lambda function names based on branch
           if [[ "${branch_name}" == feature/* ]]; then
-            echo "AWS_LAMBDA=${{ env.AWS_LAMBDA }}_dev" >> $GITHUB_ENV
+            suffix="_dev"
           elif [[ "${branch_name}" == main ]]; then
-            echo "AWS_LAMBDA=${{ env.AWS_LAMBDA }}_prod" >> $GITHUB_ENV
+            suffix="_prod"
           else
             echo "Invalid branch name"
             exit 1
           fi
+
+          echo "AWS_LAMBDA=${{ env.AWS_LAMBDA }}${suffix}" >> $GITHUB_ENV
+          echo "EMAIL_HANDLER_LAMBDA=${{ env.EMAIL_HANDLER_LAMBDA }}${suffix}" >> $GITHUB_ENV
 
       - name: 'Update Lambda Function with S3 Object Name'
         run: |
@@ -146,6 +168,15 @@ jobs:
             --function-name=${{ env.AWS_LAMBDA }} \
             --s3-bucket=${{ env.AWS_BUCKET }} \
             --s3-key=${{ env.s3_object_name }} \
+            --cli-read-timeout 60 \
+            --cli-connect-timeout 60
+
+      - name: 'Update Email Handler Lambda'
+        run: |
+          aws lambda update-function-code \
+            --function-name=${{ env.EMAIL_HANDLER_LAMBDA }} \
+            --s3-bucket=${{ env.AWS_BUCKET }} \
+            --s3-key=email-handler/${{ env.s3_object_name }} \
             --cli-read-timeout 60 \
             --cli-connect-timeout 60
 

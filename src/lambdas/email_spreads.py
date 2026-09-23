@@ -79,7 +79,7 @@ async def read_and_notify():
 
     queue_service = QueueService()
     messages = []
-    for user in UserModel.select():
+    for user in UserModel.select().where(UserModel.username == "brayden.kness"):
         try:
             queue_service.send_email(
                 EmailMessage(
