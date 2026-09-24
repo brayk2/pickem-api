@@ -3,6 +3,8 @@ from itertools import groupby
 
 from src.components.email.email_models import EmailMessage
 from src.components.email.email_service import EmailService
+from botocore.exceptions import ClientError
+
 from src.integrations.queue_service import QueueService
 from src.components.results.results_models import MatchupDto, TeamDto
 from src.components.season.season_service import SeasonService
@@ -13,6 +15,9 @@ from src.models.db_models import (
     UserModel,
 )
 from src.components.spread.spread_service import SpreadService
+from src.config.logger import Logger
+
+logger = Logger()
 
 
 def _format_line(line: str | None) -> str | None:
@@ -98,9 +103,12 @@ async def read_and_notify():
         picks_url=f"https://pickem-webapp.vercel.app/picks/{year}/{week}",
     )
 
+    recipients = list(_enrolled_users(year))
+    logger.info(f"Queueing week {week} lines for {len(recipients)} users in {year}")
+
     queue_service = QueueService()
     messages = []
-    for user in _enrolled_users(year):
+    for user in recipients:
         try:
             queue_service.send_email(
                 EmailMessage(
@@ -115,13 +123,29 @@ async def read_and_notify():
                     "status": "queued",
                 }
             )
-        except Exception:
+        except ClientError as e:
+            # QueueService already logged which SQS call failed and why.
+            logger.error(f"Failed to queue lines for {user.email}: {e}")
             messages.append(
                 {
                     "message": f"failed to queue email to {user.email}",
                     "status": "failed",
                 }
             )
+        except Exception:
+            logger.exception(f"Failed to queue lines for {user.email}")
+            messages.append(
+                {
+                    "message": f"failed to queue email to {user.email}",
+                    "status": "failed",
+                }
+            )
+
+    failed = sum(1 for m in messages if m["status"] == "failed")
+    if failed:
+        logger.error(f"Queued {len(messages) - failed} of {len(messages)}; {failed} failed")
+    else:
+        logger.info(f"Queued all {len(messages)} lines emails")
     return messages
 
 
