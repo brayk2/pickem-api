@@ -14,5 +14,5 @@ Here are the lines for week {{ week }}. Away team listed first; lines from Draft
 
 Make your picks: {{ picks_url }}
 
-Lines can move before kickoff.
+Lines will not move after being loaded, these lines are final.
 - PickEm
