@@ -6,8 +6,10 @@ from src.components.standings.standings_models import (
     LeagueSeasonStandingsDto,
     StandingsDto,
     StandingsHistoryDto,
+    TeamSeasonStatsDto,
     UserHistoryDto,
 )
+from src.components.standings.team_season_stats import build_team_season_stats
 from src.models.db_models import SeasonModel, WeekModel
 from src.config.base_service import BaseService
 from src.config.logger import Logger
@@ -122,6 +124,23 @@ class StandingsService(BaseService):
         standings = self.build_standings(rows, usernames)
         self.logger.info(f"Standings calculated for week {week} of year {year}")
         return standings
+
+    async def get_team_season_stats(
+        self, year: int, week: int, league_id: int
+    ) -> TeamSeasonStatsDto:
+        """
+        The league's season so far team by team, through `week`.
+
+        The same graded rows as the table beside it, grouped by the team picked
+        rather than by the player -- one query, no second grading.
+        """
+        self.logger.info(
+            f"Fetching team season stats for league {league_id}, {year} through week {week}"
+        )
+        rows = self.results_service.get_graded_picks_through_week(
+            year=year, week=week, league_id=league_id
+        )
+        return build_team_season_stats(rows, year=year, through_week=week)
 
     async def get_standings_history(
         self, year: int, week: int, league_id: int

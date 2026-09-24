@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, Path
 from src.security.security_models import DecodedToken
 from src.components.league.league_permission import LeaguePermission
-from src.components.standings.standings_models import StandingsHistoryDto, StandingsDto
+from src.components.standings.standings_models import (
+    StandingsDto,
+    StandingsHistoryDto,
+    TeamSeasonStatsDto,
+)
 from src.components.standings.standings_service import StandingsService
 
 
@@ -18,6 +22,26 @@ async def get_standings_history(
 ):
     return await standings_service.get_standings_history(
         year, week, league_id=league_id
+    )
+
+
+@standings_router.get(
+    "/{league_id}/{year}/{week}/teams", response_model=TeamSeasonStatsDto
+)
+async def get_team_season_stats(
+    league_id: int,
+    year: int,
+    week: int,
+    _: DecodedToken = Depends(LeaguePermission.league_member),
+    standings_service: StandingsService = Depends(StandingsService.create),
+):
+    """
+    How the league has done with every team it has picked, from week one
+    through `week`: record against the spread, points won and missed, who
+    picked them, each team's weekly form, and the season's standout teams.
+    """
+    return await standings_service.get_team_season_stats(
+        year=year, week=week, league_id=league_id
     )
 
 
