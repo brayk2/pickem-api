@@ -6,7 +6,12 @@ from src.components.email.email_service import EmailService
 from src.integrations.queue_service import QueueService
 from src.components.results.results_models import MatchupDto, TeamDto
 from src.components.season.season_service import SeasonService
-from src.models.db_models import UserModel
+from src.models.db_models import (
+    LeagueMemberModel,
+    LeagueSeasonModel,
+    SeasonModel,
+    UserModel,
+)
 from src.components.spread.spread_service import SpreadService
 
 
@@ -54,6 +59,22 @@ def _days(matchups: list[MatchupDto]) -> list[dict]:
     ]
 
 
+def _enrolled_users(year: int):
+    """Users on any league's roster for the season. Distinct, because one
+    user can play in more than one league in the same year."""
+    return (
+        UserModel.select()
+        .join(LeagueMemberModel, on=(LeagueMemberModel.user == UserModel.id))
+        .join(
+            LeagueSeasonModel,
+            on=(LeagueMemberModel.league_season == LeagueSeasonModel.id),
+        )
+        .join(SeasonModel, on=(LeagueSeasonModel.season == SeasonModel.id))
+        .where(SeasonModel.year == year)
+        .distinct()
+    )
+
+
 async def read_and_notify():
     spread_service = SpreadService()
     season_service = SeasonService()
@@ -79,7 +100,7 @@ async def read_and_notify():
 
     queue_service = QueueService()
     messages = []
-    for user in UserModel.select():
+    for user in _enrolled_users(year):
         try:
             queue_service.send_email(
                 EmailMessage(
