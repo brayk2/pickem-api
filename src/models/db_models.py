@@ -313,12 +313,6 @@ class ActionModel(BaseModel):
 
 
 class PasswordResetTokensModel(BaseModel):
-    # The table has created_at but none of the other audit columns
-    # (migrations/004_reset_password_flow.sql), so drop them from the insert.
-    created_by = None
-    updated_at = None
-    updated_by = None
-
     user = ForeignKeyField(
         UserModel, backref="password_reset_tokens", on_delete="CASCADE"
     )
