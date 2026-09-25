@@ -36,6 +36,10 @@ async def get_user_pick_results(
 async def get_season_user_pick_results(
     league_id: int,
     year: int,
+    username: str | None = Query(
+        default=None,
+        description="Whose season to read. Defaults to the caller's own.",
+    ),
     results_service: ResultsService = Depends(ResultsService.create),
     token: DecodedToken = Depends(LeaguePermission.league_member),
 ):
@@ -50,9 +54,15 @@ async def get_season_user_pick_results(
     `rank` is deliberately null. The score here is a season total for one
     player, with nobody to rank them against -- returning the 1 that ranking a
     single-row result produces would read as a league position.
+
+    `username` reads another member's season, for their public profile. That
+    needs no extra privacy rule: only graded picks are ever returned, so it
+    shows nothing a league member couldn't already see on the results page.
+    The caller must still be in the league; a username that isn't simply gets
+    the empty row.
     """
     return await results_service.get_user_season_results(
-        year, league_id=league_id, username=token.sub
+        year, league_id=league_id, username=username or token.sub
     )
 
 

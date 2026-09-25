@@ -84,6 +84,31 @@ def score_pick(pick_status: str, confidence: int) -> float:
     return (confidence or 0) * PICK_MULTIPLIERS.get(pick_status, 0.0)
 
 
+def crowd_counts(rows: list[dict], username: str) -> dict[int, tuple[int, int]]:
+    """
+    For each of one player's picks, how many other players took the same side
+    of that game and how many took the other side, keyed by pick id.
+
+    `rows` are the league's graded picks for the season, the player's among
+    them. Nobody is counted against themselves.
+    """
+    sides: dict[int, dict[int, int]] = {}
+    for row in rows:
+        if row["username"] == username:
+            continue
+        game = sides.setdefault(row["game_id"], {})
+        game[row["selected_team_id"]] = game.get(row["selected_team_id"], 0) + 1
+
+    counts = {}
+    for row in rows:
+        if row["username"] != username:
+            continue
+        game = sides.get(row["game_id"], {})
+        same = game.get(row["selected_team_id"], 0)
+        counts[row["id"]] = (same, sum(game.values()) - same)
+    return counts
+
+
 @dependency
 class ResultsService(BaseService):
     @inject
@@ -443,6 +468,17 @@ class ResultsService(BaseService):
         ):
             season = results[0]
             season.rank = None
+
+            # The whole league's graded picks, to say how everyone else played
+            # each of this player's games.
+            counts = crowd_counts(
+                self.get_graded_picks(year=year, league_id=league_id),
+                username=username,
+            )
+            for pick in season.picks:
+                same, other = counts.get(pick.id, (0, 0))
+                pick.same_side = same
+                pick.other_side = other
             return season
         return UserPickResultsDto(username=username, picks=[], total_score=0, rank=None)
 
