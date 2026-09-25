@@ -109,6 +109,74 @@ def test_form_grades_each_team_including_ones_nobody_took():
     assert [n.team_name for n in s.never_picked] == ["Jets"]
 
 
+def game(game_id, week, home, away, home_score, away_score, home_line, away_line):
+    """One schedule row, shaped like ResultsService.get_games_through_week."""
+    return {
+        "game_id": game_id,
+        "week_number": week,
+        "home_team_score": home_score,
+        "away_team_score": away_score,
+        "home_team_line": home_line,
+        "away_team_line": away_line,
+        **_team("home_team", home),
+        **_team("away_team", away),
+    }
+
+
+# The same two weeks as ROWS plus the rest of the schedule: in week 2 KC and
+# LV play a game nobody picked (LV, home, -1, wins 30-10 and covers), and in
+# week 3 KC is on a bye while BUF/NYJ haven't finished.
+GAMES = [
+    game(10, 1, 1, 2, 24, 17, -3.0, 3.0),
+    game(11, 2, 3, 4, 20, 17, -6.5, 6.5),
+    game(12, 2, 2, 1, 30, 10, -1.0, 1.0),
+    game(13, 3, 3, 4, None, None, -2.5, 2.5),
+]
+
+
+def with_schedule():
+    return build_team_season_stats(ROWS, year=2025, through_week=3, games=GAMES)
+
+
+def test_form_grades_games_nobody_picked_at_the_house_line():
+    kc = team(with_schedule(), "Chiefs")
+    assert [(w.week, w.result, w.pick_count, w.bye) for w in kc.form] == [
+        (1, "COVERED", 2, False),
+        (2, "FAILED", 0, False),
+        (3, None, 0, True),
+    ]
+
+
+def test_form_prefers_the_leagues_line_to_the_house_line():
+    # The book closed BUF at -6.5, where a 3-point win misses anyway; the league
+    # took them at -7. Either way the square agrees with the picks under it.
+    bills = team(with_schedule(), "Bills")
+    assert [(w.week, w.result, w.bye) for w in bills.form] == [
+        (1, None, True),
+        (2, "FAILED", False),
+        # Played, not final: no result, and not a bye.
+        (3, None, False),
+    ]
+
+
+def test_house_line_on_one_side_grades_both():
+    # The book only has LV's side of game 12; KC's is that line negated, +1,
+    # and a 20-point loss misses it.
+    games = [GAMES[0], game(12, 2, 2, 1, 30, 10, -1.0, None)]
+    s = build_team_season_stats(ROWS[:1], year=2025, through_week=2, games=games)
+    assert team(s, "Chiefs").form[1].result == "FAILED"
+
+
+def test_never_picked_includes_teams_whose_games_nobody_touched():
+    TEAMS.update({5: "Bears", 6: "Lions"})
+    try:
+        games = GAMES + [game(14, 1, 5, 6, 21, 20, -2.0, 2.0)]
+        s = build_team_season_stats(ROWS, year=2025, through_week=3, games=games)
+    finally:
+        del TEAMS[5], TEAMS[6]
+    assert [n.team_name for n in s.never_picked] == ["Bears", "Jets", "Lions"]
+
+
 def test_teams_open_sorted_by_points_won_then_picks():
     # Bills and Raiders both scored nothing; the more-picked team leads.
     assert [t.team.team_name for t in stats().teams] == ["Chiefs", "Bills", "Raiders"]

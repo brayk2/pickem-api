@@ -20,6 +20,7 @@ from src.models.db_models import (
     TeamModel,
     GameModel,
     SeasonModel,
+    SpreadModel,
     WeekModel,
 )
 from src.components.league.league_service import LeagueService
@@ -39,6 +40,11 @@ _pick = PickModel.alias()
 _game_result = GameResultModel.alias()
 _season = SeasonModel.alias()
 _week_model = WeekModel.alias()
+_home_line = SpreadModel.alias()
+_away_line = SpreadModel.alias()
+
+# The book the league's lines come from.
+HOUSE_BOOK = "DraftKings"
 
 # A covered pick is worth its confidence, a push half, a miss nothing.
 PICK_MULTIPLIERS = {"COVERED": 1.0, "PUSHED": 0.5, "FAILED": 0.0}
@@ -228,6 +234,66 @@ class ResultsService(BaseService):
             conditions.append(_user.username == user)
 
         return self._grade(self._graded_picks_query(conditions))
+
+    def get_games_through_week(self, year: int, week: int) -> list[dict]:
+        """
+        Every game of the season from week one through `week`, picked or not,
+        with its score (None until final) and the house line on each side.
+
+        The graded picks only reach games somebody picked. A team's own record
+        against the spread needs the rest too, and which weeks it had no game
+        at all -- its bye.
+        """
+        query = (
+            _game.select(
+                _game.id.alias("game_id"),
+                _week_model.week_number,
+                _home_team.id.alias("home_team_id"),
+                _home_team.name.alias("home_team_name"),
+                _home_team.city.alias("home_team_city"),
+                _home_team.abbreviation.alias("home_team_abbreviation"),
+                _home_team.thumbnail.alias("home_team_thumbnail"),
+                _home_team.primary_color.alias("home_team_primary_color"),
+                _home_team.secondary_color.alias("home_team_secondary_color"),
+                _away_team.id.alias("away_team_id"),
+                _away_team.name.alias("away_team_name"),
+                _away_team.city.alias("away_team_city"),
+                _away_team.abbreviation.alias("away_team_abbreviation"),
+                _away_team.thumbnail.alias("away_team_thumbnail"),
+                _away_team.primary_color.alias("away_team_primary_color"),
+                _away_team.secondary_color.alias("away_team_secondary_color"),
+                _game_result.home_score.alias("home_team_score"),
+                _game_result.away_score.alias("away_team_score"),
+                _home_line.spread_value.alias("home_team_line"),
+                _away_line.spread_value.alias("away_team_line"),
+            )
+            .join(_home_team, on=(_game.home_team == _home_team.id))
+            .join(_away_team, on=(_game.away_team == _away_team.id))
+            .join(_season, on=(_game.season == _season.id))
+            .join(_week_model, on=(_game.week == _week_model.id))
+            .join(_game_result, JOIN.LEFT_OUTER, on=(_game_result.game == _game.id))
+            .join(
+                _home_line,
+                JOIN.LEFT_OUTER,
+                on=(
+                    (_home_line.game == _game.id)
+                    & (_home_line.team == _game.home_team)
+                    & (_home_line.bookmaker == HOUSE_BOOK)
+                ),
+            )
+            .join(
+                _away_line,
+                JOIN.LEFT_OUTER,
+                on=(
+                    (_away_line.game == _game.id)
+                    & (_away_line.team == _game.away_team)
+                    & (_away_line.bookmaker == HOUSE_BOOK)
+                ),
+            )
+            .where(_season.year == year, _week_model.week_number <= week)
+            .order_by(_week_model.week_number)
+        )
+        return list(query.dicts())
 
     def get_graded_picks_for_seasons(self, league_season_ids: list[int]) -> list[dict]:
         """
