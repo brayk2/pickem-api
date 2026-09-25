@@ -195,8 +195,29 @@ class StandingsService(BaseService):
                 )
 
         return StandingsHistoryDto(
-            year=year, weeks=weeks, users=list(user_histories.values())
+            year=year,
+            weeks=weeks,
+            users=list(user_histories.values()),
+            completed=self.completed_weeks(year=year, through_week=week),
         )
+
+    @staticmethod
+    def completed_weeks(year: int, through_week: int) -> list[int]:
+        """The season's finished weeks, up to and including `through_week`."""
+        return [
+            row["week_number"]
+            for row in (
+                WeekModel.select(WeekModel.week_number)
+                .join(SeasonModel, on=(WeekModel.season == SeasonModel.id))
+                .where(
+                    (SeasonModel.year == year)
+                    & (WeekModel.week_number <= through_week)
+                    & (WeekModel.completed == True)  # noqa: E712 -- peewee expression
+                )
+                .order_by(WeekModel.week_number)
+                .dicts()
+            )
+        ]
 
     def finished_years(self, years: list[int]) -> set[int]:
         """

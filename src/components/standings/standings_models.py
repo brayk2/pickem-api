@@ -26,6 +26,10 @@ class StandingsHistoryDto(BaseModel):
     year: int
     weeks: list[int]  # List of week numbers
     users: list[UserHistoryDto]  # List of user ranking histories
+    # The weeks in `weeks` whose every game is final. A week still being
+    # played has a partial score in the running totals; anything judging form
+    # week against week (hot and cold) must skip it or it flickers all Sunday.
+    completed: list[int] = []
 
 
 class LeagueSeasonStandingsDto(BaseDto):

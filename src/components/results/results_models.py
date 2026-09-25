@@ -88,6 +88,12 @@ class PickDto(BaseDto):
     # the path already says, but a season's worth of picks arrives as one flat
     # list and would otherwise have no way to say when any of it happened.
     week: int | None = Field(default=None)
+    # How the rest of the league played the same game: how many others took
+    # this side, and how many the other. Only filled in on a player's season,
+    # for their profile's with-or-against-the-crowd split -- and only from
+    # graded picks, which the results page already shows to everyone.
+    same_side: int | None = Field(default=None)
+    other_side: int | None = Field(default=None)
 
 
 class UserPickResultsDto(BaseDto):
