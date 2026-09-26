@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import List
 import pytz
-from jose import JWTError, jwt
+from jose import ExpiredSignatureError, JWTError, jwt
 from src.security.security_models import (
     DecodedToken,
     LeagueClaim,
@@ -11,7 +11,7 @@ from src.security.security_exceptions import InvalidTokenException
 from src.config.base_service import BaseService
 from src.config.settings import Settings
 from src.security.password_manager import PasswordManager
-from src.integrations.secret_service import SecretService
+from src.integrations.secret_service import DEFAULT_MAX_AGE_S, SecretService
 from src.util.injection import dependency, inject
 
 
@@ -103,7 +103,11 @@ class OAuthService(BaseService):
         return (
             jwt.encode(
                 to_encode,
-                self.secret_service.get_secret(secret_path=self.settings.secret_path),
+                # Always sign with the current key: a token signed with a
+                # cached pre-rotation key would fail everywhere else.
+                self.secret_service.get_secret(
+                    secret_path=self.settings.secret_path, max_age_s=0
+                ),
                 algorithm=self.algorithm,
             ),
             to_encode,
@@ -118,14 +122,26 @@ class OAuthService(BaseService):
         :raises InvalidTokenException: If the token is invalid or decoding fails.
         """
         try:
-            payload_dict = jwt.decode(
-                token,
-                self.secret_service.get_secret(secret_path=self.settings.secret_path),
-                algorithms=[self.algorithm],
-            )
-            return DecodedToken.from_dict(payload_dict)
-        except JWTError:
+            payload_dict = self._decode(token, max_age_s=DEFAULT_MAX_AGE_S)
+        except ExpiredSignatureError:
             raise InvalidTokenException()
+        except JWTError:
+            # The cached key may predate a rotation; check once more against
+            # the current one before calling the token bad.
+            try:
+                payload_dict = self._decode(token, max_age_s=0)
+            except JWTError:
+                raise InvalidTokenException()
+        return DecodedToken.from_dict(payload_dict)
+
+    def _decode(self, token: str, max_age_s: float) -> dict:
+        return jwt.decode(
+            token,
+            self.secret_service.get_secret(
+                secret_path=self.settings.secret_path, max_age_s=max_age_s
+            ),
+            algorithms=[self.algorithm],
+        )
 
     def generate_tokens(
         self,

@@ -16,7 +16,10 @@ from src.config.base_service import BaseService
 from src.integrations.queue_service import QueueService
 from src.models.db_models import PasswordResetTokensModel, UserModel
 from src.security.oauth_service import OAuthService
-from src.security.security_exceptions import IncorrectCredentialsException
+from src.security.security_exceptions import (
+    IncorrectCredentialsException,
+    InvalidTokenException,
+)
 from src.security.security_models import TokenResponse
 from src.util.injection import dependency, inject
 
@@ -54,6 +57,18 @@ class AuthService(BaseService):
         if not user or not self.oauth_service.verify_password(
             password, user.password_hash
         ):
+            # Tells "no such username" (typos, phone keyboards capitalizing)
+            # apart from "wrong password" when reading login failures.
+            self.logger.warning(
+                "login failed",
+                extra={
+                    "fields": {
+                        "type": "login_failed",
+                        "reason": "unknown_user" if not user else "bad_password",
+                        "username": username,
+                    }
+                },
+            )
             raise IncorrectCredentialsException()
 
         return self._generate_tokens(user=user)
@@ -63,6 +78,10 @@ class AuthService(BaseService):
 
         # Re-read roles and league standing so a refresh picks up roster changes
         user = self.user_service.get_user_by_username(decoded_token.sub)
+        if not user:
+            # A deleted or renamed account: the token is no good. Without
+            # this it was a 500, which clients can't tell from an outage.
+            raise InvalidTokenException()
         return self._generate_tokens(user=user)
 
     def _generate_tokens(self, user: UserModel) -> TokenResponse:
