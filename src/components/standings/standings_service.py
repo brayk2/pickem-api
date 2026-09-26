@@ -132,7 +132,8 @@ class StandingsService(BaseService):
         The league's season so far team by team, through `week`.
 
         The same graded rows as the table beside it, grouped by the team picked
-        rather than by the player -- one query, no second grading.
+        rather than by the player -- no second grading. The season's games come
+        alongside so each team's own weekly form covers games nobody picked.
         """
         self.logger.info(
             f"Fetching team season stats for league {league_id}, {year} through week {week}"
@@ -140,7 +141,10 @@ class StandingsService(BaseService):
         rows = self.results_service.get_graded_picks_through_week(
             year=year, week=week, league_id=league_id
         )
-        return build_team_season_stats(rows, year=year, through_week=week)
+        games = self.results_service.get_games_through_week(year=year, week=week)
+        return build_team_season_stats(
+            rows, year=year, through_week=week, games=games
+        )
 
     async def get_standings_history(
         self, year: int, week: int, league_id: int

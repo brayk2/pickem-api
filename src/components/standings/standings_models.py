@@ -52,17 +52,22 @@ class LeagueSeasonStandingsDto(BaseDto):
 # --- season team statistics -------------------------------------------------
 #
 # Everything below counts the league's picks, not the NFL season: a team's
-# "record" here is how the league did when it picked that team.
+# "record" here is how the league did when it picked that team. The exception
+# is `form`, which is the team's own week-by-week result against the spread.
 
 
 class TeamWeekDto(BaseDto):
-    """One week of a team's form: its own result against the spread."""
+    """
+    One week of a team's form: its own result against the spread, whether or
+    not the league picked the game.
+    """
 
     week: int
-    # None when the team's game had no picks at all, or it was a bye -- there
-    # is no line on record to grade it against.
+    # None on a bye, and for a game that isn't final or has no line on record.
     result: PickOutcome | None = None
     pick_count: int = 0
+    # The team had no game this week.
+    bye: bool = False
 
 
 class TeamBackerDto(BaseDto):
@@ -133,8 +138,6 @@ class TeamSeasonStatsDto(BaseDto):
     points_won: float = 0.0
     points_riding: int = 0
     teams: List[TeamSeasonDto] = Field(default_factory=list)
-    # Teams that played in a picked game but were never picked themselves.
-    # Teams whose games nobody touched don't appear anywhere in the picks, so
-    # this is not necessarily every unpicked team in the league.
+    # Teams with a game this season that nobody has picked.
     never_picked: List[TeamDto] = Field(default_factory=list)
     awards: TeamSeasonAwardsDto = Field(default_factory=TeamSeasonAwardsDto)
