@@ -1,6 +1,7 @@
 from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+from src.config import request_context
 from src.security.security_models import DecodedToken
 from src.security.security_exceptions import (
     InvalidTokenException,
@@ -30,9 +31,10 @@ class PermissionChecker:
     ) -> DecodedToken:
         try:
             payload = oauth_service.decode_token(token.credentials)
-            return payload
         except Exception:
             raise InvalidTokenException
+        request_context.set_user(payload.sub)
+        return payload
 
     @classmethod
     def authenticated(
