@@ -71,30 +71,40 @@ def _book_line(game: dict, prefix: str) -> float | None:
     return None if line is None else float(line)
 
 
-def _game_form(game: dict, rows: list[dict]) -> dict[int, str]:
+def side_line(game: dict, rows: list[dict], prefix: str, other: str) -> float | None:
     """
-    Each side's own result against the spread in one game, keyed by team id.
+    The line one side of a game is graded at.
 
     A game the league picked is graded at the line it was most commonly picked
-    at, the same way the week statistics grade a side, so a square agrees with
-    the picks under it. A side nobody took still has a line: it is the other
-    side's, negated. A game nobody picked falls back to the house line. One
-    that isn't final, or has no line anywhere, has no result.
+    at, the same way the week statistics grade a side, so a result agrees with
+    the picks on it. A side nobody took still has a line: it is the other
+    side's, negated. A game nobody picked falls back to the house line. None
+    when there is no line anywhere.
+    """
+    own = [r for r in rows if r["selected_team_id"] == game[f"{prefix}_id"]]
+    theirs = [r for r in rows if r["selected_team_id"] == game[f"{other}_id"]]
+    line = modal_line(own)
+    if line is None and (opposite := modal_line(theirs)) is not None:
+        line = -opposite
+    if line is None:
+        line = _book_line(game, prefix)
+    if line is None and (opposite := _book_line(game, other)) is not None:
+        line = -opposite
+    return line
+
+
+def _game_form(game: dict, rows: list[dict]) -> dict[int, str]:
+    """
+    Each side's own result against the spread in one game, keyed by team id,
+    graded at `side_line`. One that isn't final, or has no line anywhere, has
+    no result.
     """
     if game["home_team_score"] is None or game["away_team_score"] is None:
         return {}
 
     results = {}
     for prefix, other in (("home_team", "away_team"), ("away_team", "home_team")):
-        own = [r for r in rows if r["selected_team_id"] == game[f"{prefix}_id"]]
-        theirs = [r for r in rows if r["selected_team_id"] == game[f"{other}_id"]]
-        line = modal_line(own)
-        if line is None and (opposite := modal_line(theirs)) is not None:
-            line = -opposite
-        if line is None:
-            line = _book_line(game, prefix)
-        if line is None and (opposite := _book_line(game, other)) is not None:
-            line = -opposite
+        line = side_line(game, rows, prefix, other)
         if line is None:
             continue
         results[game[f"{prefix}_id"]] = outcome(

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, HTTPException, Path
 from src.security.security_models import DecodedToken
 from src.components.league.league_permission import LeaguePermission
 from src.components.standings.standings_models import (
     StandingsDto,
     StandingsHistoryDto,
+    TeamPageDto,
     TeamSeasonStatsDto,
 )
 from src.components.standings.standings_service import StandingsService
@@ -43,6 +44,30 @@ async def get_team_season_stats(
     return await standings_service.get_team_season_stats(
         year=year, week=week, league_id=league_id
     )
+
+
+@standings_router.get(
+    "/{league_id}/{year}/{week}/teams/{team_id}", response_model=TeamPageDto
+)
+async def get_team_page(
+    league_id: int,
+    year: int,
+    week: int,
+    team_id: int,
+    _: DecodedToken = Depends(LeaguePermission.league_member),
+    standings_service: StandingsService = Depends(StandingsService.create),
+):
+    """
+    One team's season: its games from its side of the line -- score, margin,
+    who in the league took each side -- and how the league has done picking it
+    through `week`.
+    """
+    page = await standings_service.get_team_page(
+        year=year, week=week, league_id=league_id, team_id=team_id
+    )
+    if page is None:
+        raise HTTPException(status_code=404, detail="No games for that team this season.")
+    return page
 
 
 @standings_router.get(

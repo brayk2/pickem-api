@@ -171,12 +171,14 @@ class WeekAwardsDto(BaseDto):
 
 class WeekStatsDto(BaseDto):
     """
-    End-of-week statistics for one league.
+    A week's statistics for one league.
 
-    Only published once the week is complete: a "most missed pick" computed on
-    Sunday evening is a different pick by Tuesday, and a leaderboard that keeps
-    rewriting its own history is worse than no leaderboard. When `completed` is
-    false every other field is empty and callers should render nothing.
+    While the week is in progress (`completed` false) these are running
+    figures over the games already final -- every pick counted here is graded,
+    none is a guess about a game still being played -- and `pick_count` is how
+    many of the week's picks that covers. Awards stay empty until the week is
+    complete: a "most missed pick" computed on Sunday evening is a different
+    pick by Tuesday. Before any game is final every figure is empty.
     """
 
     year: int

@@ -6,9 +6,11 @@ from src.components.standings.standings_models import (
     LeagueSeasonStandingsDto,
     StandingsDto,
     StandingsHistoryDto,
+    TeamPageDto,
     TeamSeasonStatsDto,
     UserHistoryDto,
 )
+from src.components.standings.team_page import build_team_page
 from src.components.standings.team_season_stats import build_team_season_stats
 from src.models.db_models import SeasonModel, WeekModel
 from src.config.base_service import BaseService
@@ -144,6 +146,31 @@ class StandingsService(BaseService):
         games = self.results_service.get_games_through_week(year=year, week=week)
         return build_team_season_stats(
             rows, year=year, through_week=week, games=games
+        )
+
+    async def get_team_page(
+        self, year: int, week: int, league_id: int, team_id: int
+    ) -> TeamPageDto | None:
+        """
+        One team's season: its games from its side of the line -- through
+        `week` for results, the whole schedule for what's still to come -- and
+        how the league has done picking it through `week`.
+        """
+        self.logger.info(
+            f"Fetching team {team_id} page for league {league_id}, {year} through week {week}"
+        )
+        rows = self.results_service.get_graded_picks_through_week(
+            year=year, week=week, league_id=league_id
+        )
+        games = self.results_service.get_games_through_week(year=year, week=week)
+        return build_team_page(
+            team_id,
+            year=year,
+            through_week=week,
+            rows=rows,
+            games=games,
+            # The rest of the season too, so the page can show what's to come.
+            schedule=self.results_service.get_games_through_week(year=year, week=99),
         )
 
     async def get_standings_history(
