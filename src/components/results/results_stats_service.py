@@ -64,18 +64,19 @@ class ResultsStatsService(BaseService):
         self.logger.info(
             f"Getting week stats for league {league_id}, {year} week {week}"
         )
-        if not self.week_service.is_complete(year=year, week=week):
-            self.logger.info(
-                f"Week {week} of {year} is not complete; withholding week stats"
-            )
-            return WeekStatsDto(year=year, week=week, completed=False)
+        # A week in progress gets running stats over the games already final:
+        # the graded-picks query only reaches games with both scores in, so
+        # nothing here is ever a guess about a game still being played. Awards
+        # wait for the whole week -- "player of the week" on a Sunday evening
+        # is a different player by Tuesday.
+        completed = self.week_service.is_complete(year=year, week=week)
 
         picks = self.results_service.get_graded_picks_for_week(
             year=year, week=week, league_id=league_id
         )
         if not picks:
-            self.logger.info(f"Week {week} of {year} is complete but has no picks")
-            return WeekStatsDto(year=year, week=week, completed=True)
+            self.logger.info(f"Week {week} of {year} has no graded picks yet")
+            return WeekStatsDto(year=year, week=week, completed=completed)
 
         games = self._build_game_breakdowns(picks)
 
@@ -86,7 +87,7 @@ class ResultsStatsService(BaseService):
         return WeekStatsDto(
             year=year,
             week=week,
-            completed=True,
+            completed=completed,
             player_count=len(scores),
             pick_count=len(picks),
             game_count=len(games),
@@ -102,7 +103,9 @@ class ResultsStatsService(BaseService):
             ],
             confidence_breakdown=self._confidence_breakdown(picks),
             games=games,
-            awards=self._awards(picks, games, scores),
+            awards=(
+                self._awards(picks, games, scores) if completed else WeekAwardsDto()
+            ),
         )
 
     def _build_game_breakdowns(self, picks: list[dict]) -> list[GameBreakdownDto]:
