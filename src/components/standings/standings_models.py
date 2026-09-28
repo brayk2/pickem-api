@@ -1,3 +1,4 @@
+from datetime import date, time
 from typing import List
 
 from pydantic import BaseModel, Field
@@ -141,3 +142,50 @@ class TeamSeasonStatsDto(BaseDto):
     # Teams with a game this season that nobody has picked.
     never_picked: List[TeamDto] = Field(default_factory=list)
     awards: TeamSeasonAwardsDto = Field(default_factory=TeamSeasonAwardsDto)
+
+
+# One team's page: its season game by game, and how the league has played it.
+
+
+class TeamGamePickDto(BaseDto):
+    """One league pick on one side of a team's game."""
+
+    username: str
+    confidence: int
+    pick_status: PickOutcome
+    score: float = 0.0
+
+
+class TeamGameDto(BaseDto):
+    """
+    One of a team's games, from the team's side: its line, the score, how far
+    past or short of the line it finished, and who in the league took each side.
+    """
+
+    week: int
+    game_id: int
+    opponent: TeamDto
+    is_home: bool
+    # Kickoff, as stored (Eastern wall clock). None until the NFL sets it.
+    start_date: date | None = None
+    start_time: time | None = None
+    # The line the team's result is graded at: the one the league took it at
+    # most, else the house line. None when there's no line on record.
+    line: float | None = None
+    team_score: int | None = None
+    opponent_score: int | None = None
+    # None until the game is final.
+    margin: float | None = None
+    result: PickOutcome | None = None
+    picks_for: List[TeamGamePickDto] = Field(default_factory=list)
+    picks_against: List[TeamGamePickDto] = Field(default_factory=list)
+
+
+class TeamPageDto(BaseDto):
+    team: TeamDto
+    year: int
+    through_week: int
+    # How the league has done with the team this season. The same entry the
+    # standings' team panel shows, so the two always agree.
+    season: TeamSeasonDto | None = None
+    games: List[TeamGameDto] = Field(default_factory=list)

@@ -248,6 +248,8 @@ class ResultsService(BaseService):
             _game.select(
                 _game.id.alias("game_id"),
                 _week_model.week_number,
+                _game.start_date,
+                _game.start_time,
                 _home_team.id.alias("home_team_id"),
                 _home_team.name.alias("home_team_name"),
                 _home_team.city.alias("home_team_city"),
