@@ -6,10 +6,11 @@ game the same way -- the same modal line, the same margin, the same idea of a
 rate with nothing to divide by.
 """
 
-from collections import Counter
+from collections import Counter, defaultdict
 from statistics import mean
 
 from src.components.results.results_models import TeamDto
+from src.components.results.results_stats_models import ConfidenceBreakdownDto
 
 
 def team_dto(row: dict, prefix: str) -> TeamDto:
@@ -59,3 +60,33 @@ def outcome(margin: float) -> str:
     if margin < 0:
         return "FAILED"
     return "PUSHED"
+
+
+def confidence_breakdown(rows: list[dict]) -> list[ConfidenceBreakdownDto]:
+    """
+    How the picks at each confidence level fared, highest first: a week's for
+    the week statistics, the season's for the standings. A push is a refund,
+    not a miss, so the hit rate is covered over covered-or-failed.
+    """
+    by_confidence: dict[int, list[dict]] = defaultdict(list)
+    for row in rows:
+        by_confidence[int(row["confidence"])].append(row)
+
+    breakdown = []
+    for confidence in sorted(by_confidence, reverse=True):
+        level = by_confidence[confidence]
+        statuses = Counter(row["pick_status"] for row in level)
+        breakdown.append(
+            ConfidenceBreakdownDto(
+                confidence=confidence,
+                pick_count=len(level),
+                covered_count=statuses["COVERED"],
+                failed_count=statuses["FAILED"],
+                pushed_count=statuses["PUSHED"],
+                hit_rate=rate(
+                    statuses["COVERED"], statuses["COVERED"] + statuses["FAILED"]
+                ),
+                average_points=average([float(row["score"] or 0) for row in level]),
+            )
+        )
+    return breakdown

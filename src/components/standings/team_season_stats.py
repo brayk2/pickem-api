@@ -10,6 +10,7 @@ from collections import Counter, defaultdict
 
 from src.components.results.results_math import (
     average,
+    confidence_breakdown,
     margin,
     modal_line,
     outcome,
@@ -203,11 +204,13 @@ def build_team_season_stats(
     totals = Counter()
     points_won = 0.0
     points_riding = 0
+    graded = []
 
     for row in rows:
         sides = _sides(row)
         if sides is None or row["pick_status"] not in GRADES:
             continue
+        graded.append(row)
         picked, opponent = sides
         for prefix in sides:
             team_id = row[f"{prefix}_id"]
@@ -323,6 +326,7 @@ def build_team_season_stats(
         hit_rate=rate(totals["COVERED"], totals["COVERED"] + totals["FAILED"]),
         points_won=round(points_won, 2),
         points_riding=points_riding,
+        confidence_breakdown=confidence_breakdown(graded),
         # Most points won first -- the order the page opens in.
         teams=[
             to_dto(e)

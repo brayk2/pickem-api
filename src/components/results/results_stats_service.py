@@ -3,7 +3,6 @@ from statistics import median
 
 from src.components.results.results_models import TeamDto
 from src.components.results.results_stats_models import (
-    ConfidenceBreakdownDto,
     GameAwardDto,
     GameBreakdownDto,
     NotablePickDto,
@@ -36,6 +35,7 @@ PERFECT_WEEK_PICKS = 5
 
 
 from src.components.results.results_math import (
+    confidence_breakdown,
     average as _average,
     margin as _margin,
     modal_line as _modal_line,
@@ -101,7 +101,7 @@ class ResultsStatsService(BaseService):
                 for side in (game.home, game.away)
                 if side.pick_count
             ],
-            confidence_breakdown=self._confidence_breakdown(picks),
+            confidence_breakdown=confidence_breakdown(picks),
             games=games,
             awards=(
                 self._awards(picks, games, scores) if completed else WeekAwardsDto()
@@ -494,30 +494,6 @@ class ResultsStatsService(BaseService):
             home_pick_count=game.home.pick_count,
             away_pick_count=game.away.pick_count,
         )
-
-    @staticmethod
-    def _confidence_breakdown(picks: list[dict]) -> list[ConfidenceBreakdownDto]:
-        by_confidence: dict[int, list[dict]] = defaultdict(list)
-        for pick in picks:
-            by_confidence[pick["confidence"]].append(pick)
-
-        breakdown = []
-        for confidence in sorted(by_confidence, reverse=True):
-            rows = by_confidence[confidence]
-            statuses = Counter(row["pick_status"] for row in rows)
-            decided = sum(statuses[status] for status in GRADED_STATUSES)
-            breakdown.append(
-                ConfidenceBreakdownDto(
-                    confidence=confidence,
-                    pick_count=len(rows),
-                    covered_count=statuses["COVERED"],
-                    failed_count=statuses["FAILED"],
-                    pushed_count=statuses["PUSHED"],
-                    hit_rate=_rate(statuses["COVERED"], decided),
-                    average_points=_average([float(row["score"]) for row in rows]),
-                )
-            )
-        return breakdown
 
 
 def _side_breakdown(

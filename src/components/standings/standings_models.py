@@ -4,7 +4,10 @@ from typing import List
 from pydantic import BaseModel, Field
 
 from src.components.results.results_models import TeamDto
-from src.components.results.results_stats_models import PickOutcome
+from src.components.results.results_stats_models import (
+    ConfidenceBreakdownDto,
+    PickOutcome,
+)
 from src.models.base_models import BaseDto
 
 
@@ -138,6 +141,9 @@ class TeamSeasonStatsDto(BaseDto):
     hit_rate: float | None = None
     points_won: float = 0.0
     points_riding: int = 0
+    # How the league's picks at each value have fared, 5 down to 1 -- the
+    # season's version of the week statistics' breakdown.
+    confidence_breakdown: List[ConfidenceBreakdownDto] = Field(default_factory=list)
     teams: List[TeamSeasonDto] = Field(default_factory=list)
     # Teams with a game this season that nobody has picked.
     never_picked: List[TeamDto] = Field(default_factory=list)
