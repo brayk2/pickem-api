@@ -78,6 +78,21 @@ def test_league_totals():
     assert s.points_riding == 19
 
 
+def test_breakdown_by_pick_value_across_the_season():
+    # 5s: ann covered in week 1, bob missed in week 2. Nobody used a 1.
+    by_value = {
+        row.confidence: (row.pick_count, row.covered_count, row.failed_count, row.hit_rate)
+        for row in stats().confidence_breakdown
+    }
+    assert [row.confidence for row in stats().confidence_breakdown] == [5, 4, 3, 2]
+    assert by_value == {
+        5: (2, 1, 1, 0.5),
+        4: (1, 0, 1, 0.0),
+        3: (1, 1, 0, 1.0),
+        2: (1, 0, 1, 0.0),
+    }
+
+
 def test_team_record_and_points():
     kc = team(stats(), "Chiefs")
     assert (kc.pick_count, kc.player_count) == (2, 2)
